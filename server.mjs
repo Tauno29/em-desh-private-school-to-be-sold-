@@ -17,6 +17,9 @@ const TABLES = new Set([
   'sessions', 'login_throttle', 'learners', 'applications', 'gallery_images',
   'behavior_records', 'test_results', 'report_cards',
 ]);
+const ID_TABLES = new Set([
+  'learners', 'applications', 'gallery_images', 'behavior_records', 'test_results', 'report_cards',
+]);
 const IDENTIFIER = /^[a-z][a-z0-9_]*$/;
 const clone = (value) => structuredClone(value);
 
@@ -97,13 +100,17 @@ class MysqlQuery {
     try {
       if (this.mode === 'select') return { data: await this.fetchRows(), error: null };
       if (this.mode === 'insert') {
-        const row = { id: crypto.randomUUID(), ...this.payload };
+        const row = { ...(ID_TABLES.has(this.table) ? { id: crypto.randomUUID() } : {}), ...this.payload };
         const keys = Object.keys(row).filter((key) => IDENTIFIER.test(key));
         const sql = `INSERT INTO ${quoteIdentifier(this.table)} (${keys.map(quoteIdentifier).join(', ')}) VALUES (${keys.map(() => '?').join(', ')})`;
         await pool.query(sql, keys.map((key) => normalizeValue(row[key])));
         if (!this.columns) return { data: null, error: null };
-        const lookup = new MysqlQuery(this.table, 'select', null).select(this.columns).eq('id', row.id);
-        return { data: await lookup.fetchRows(), error: null };
+        if (row.id) {
+          const lookup = new MysqlQuery(this.table, 'select', null).select(this.columns).eq('id', row.id);
+          return { data: await lookup.fetchRows(), error: null };
+        }
+        const selected = String(this.columns).split(',').map((column) => column.trim()).filter(Boolean);
+        return { data: [Object.fromEntries(selected.map((column) => [column, clone(row[column])]))], error: null };
       }
       const before = await this.fetchRows();
       if (this.mode === 'delete') {
