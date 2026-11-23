@@ -456,28 +456,33 @@ const GRADE_RANK = { KG: 0, 1: 1, 2: 2, 3: 3, 4: 4, 5: 5, 6: 6, 7: 7 };
 function groupLearners(list) {
   const groups = new Map();
   for (const learner of list) {
-    const className = (learner.className || '').trim();
-    const key = `${learner.grade}|${className.toLowerCase()}`;
-    if (!groups.has(key)) groups.set(key, { grade: learner.grade, className, learners: [] });
+    const key = learner.grade;
+    if (!groups.has(key)) groups.set(key, { grade: learner.grade, learners: [] });
     groups.get(key).learners.push(learner);
   }
-  return [...groups.values()].sort((a, b) => {
+  return [...groups.values()].map((group) => {
+    group.learners.sort((a, b) => {
+      const classCompare = (a.className || '').localeCompare(b.className || '');
+      if (classCompare !== 0) return classCompare;
+      return `${a.lastName} ${a.firstName}`.localeCompare(`${b.lastName} ${b.firstName}`);
+    });
+    return group;
+  }).sort((a, b) => {
     const byGrade = (GRADE_RANK[a.grade] ?? 99) - (GRADE_RANK[b.grade] ?? 99);
     if (byGrade !== 0) return byGrade;
-    if (!a.className && b.className) return 1;
-    if (a.className && !b.className) return -1;
-    return a.className.localeCompare(b.className);
+    return String(a.grade).localeCompare(String(b.grade));
   });
 }
 
 function learnerGroup(group) {
   const section = document.createElement('section');
   section.className = 'learner-group';
+  section.dataset.grade = group.grade;
 
   const head = document.createElement('header');
   head.className = 'learner-group-head';
   const title = document.createElement('h3');
-  title.textContent = `${gradeLabel(group.grade)} · ${group.className ? `Class ${group.className}` : 'Class not set'}`;
+  title.textContent = gradeLabel(group.grade);
   const count = document.createElement('span');
   count.className = 'learner-group-count';
   count.textContent = `${group.learners.length} learner${group.learners.length === 1 ? '' : 's'}`;

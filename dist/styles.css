@@ -3165,7 +3165,7 @@ select.input {
   object-fit: cover;
 }
 
-/* ---------- Learner groups by grade and class ---------- */
+/* ---------- Learner groups by grade ---------- */
 
 .learner-groups {
   display: grid;
@@ -3176,6 +3176,7 @@ select.input {
 .learner-group {
   overflow: hidden;
   border: 1px solid var(--site-border);
+  border-top: 4px solid var(--site-accent);
   border-radius: var(--site-radius);
   background: var(--site-surface);
 }
@@ -3192,7 +3193,8 @@ select.input {
 
 .learner-group-head h3 {
   margin: 0;
-  font-size: 1rem;
+  font-size: 1.08rem;
+  color: var(--site-ink);
 }
 
 .learner-group-count {
