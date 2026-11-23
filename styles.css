@@ -1988,6 +1988,28 @@ select.input {
   flex-wrap: wrap;
 }
 
+.btn-danger-ghost {
+  border-color: color-mix(in srgb, #8c2f18 35%, var(--site-border));
+  color: #8c2f18;
+}
+
+.btn-danger-ghost:hover,
+.btn-danger-ghost:focus-visible {
+  border-color: #8c2f18;
+  background: #fbf0e9;
+}
+
+.btn-danger {
+  border-color: #8c2f18;
+  background: #8c2f18;
+  color: #ffffff;
+}
+
+.btn-danger:hover,
+.btn-danger:focus-visible {
+  background: #702512;
+}
+
 .panel-note {
   margin: 5px 0 0;
   font-size: 0.84rem;
@@ -2462,6 +2484,17 @@ select.input {
   font-size: 0.84rem;
   line-height: 1.5;
   color: #1c5b33;
+}
+
+.danger-notice {
+  margin-bottom: 18px;
+  padding: 13px 15px;
+  border: 1px solid #e5bca9;
+  border-radius: 9px;
+  background: #fbf0e9;
+  font-size: 0.84rem;
+  line-height: 1.5;
+  color: #7a3a20;
 }
 
 .pin-meta {

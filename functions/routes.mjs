@@ -666,6 +666,28 @@ export function application({ db, storage, BackendError, env }) {
       return json({ ok: true, learner: adminLearner(created), pin }, 201);
     }
 
+    if (path === '/api/admin/learners/bulk-delete' && is('DELETE')) {
+      await requireAdmin(request);
+      const body = await readJson(request, 1024);
+      if (body?.confirmation !== 'delete all learners') fail('delete_confirmation_required', 400);
+
+      const learnerRows = rows(await db.from('learners').select('id').limit(5000));
+      const reportCards = rows(await db.from('report_cards').select('object_path').limit(5000));
+      if (reportCards.length) {
+        try {
+          await storage.remove(reportCards.map((card) => card.object_path));
+        } catch {
+          fail('storage_unavailable', 503);
+        }
+      }
+      for (const [table, column] of [['report_cards', 'id'], ['test_results', 'id'], ['behavior_records', 'id'], ['sessions', 'token_hash'], ['learners', 'id']]) {
+        const removed = await db.from(table).delete().select(column);
+        if (removed.error) fail('database_unavailable', 503);
+      }
+      console.log('learners-bulk-deleted', learnerRows.length);
+      return json({ ok: true, deleted: learnerRows.length });
+    }
+
     const learnerMatch = path.match(/^\/api\/admin\/learners\/([0-9a-f-]{36})$/);
     if (learnerMatch && is('PATCH')) {
       await requireAdmin(request);

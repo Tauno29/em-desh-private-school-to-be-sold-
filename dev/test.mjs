@@ -502,6 +502,14 @@ check('learner failures are throttled per student', result.status === 429 && res
 
 result = await call('POST', '/api/portal/login', { body: { studentId: first.studentId, pin: newPin } });
 check('one locked learner does not block others', result.status === 200);
-
+console.log('--- bulk learner deletion ---');
+result = await call('DELETE', '/api/admin/learners/bulk-delete', { body: { confirmation: 'delete all learners' } });
+check('bulk learner delete requires admin', result.status === 401);
+result = await call('DELETE', '/api/admin/learners/bulk-delete', { cookie: adminCookie, body: { confirmation: 'delete all learner' } });
+check('bulk learner delete requires exact phrase', result.status === 400 && result.body.error === 'delete_confirmation_required');
+const learnerCountBeforeBulkDelete = db.tables.learners.length;
+result = await call('DELETE', '/api/admin/learners/bulk-delete', { cookie: adminCookie, body: { confirmation: 'delete all learners' } });
+check('bulk learner delete removes all learners', result.status === 200 && result.body.deleted === learnerCountBeforeBulkDelete && db.tables.learners.length === 0);
+check('bulk learner delete removes related rows', db.tables.sessions.length === 0 && db.tables.behavior_records.length === 0 && db.tables.test_results.length === 0 && db.tables.report_cards.length === 0);
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

@@ -59,6 +59,12 @@ const bulkPrint = document.getElementById('bulk-print');
 const bulkResultSummary = document.getElementById('bulk-result-summary');
 const bulkCredentials = document.getElementById('bulk-credentials');
 const bulkFailures = document.getElementById('bulk-failures');
+const deleteAllDialog = document.getElementById('delete-all-dialog');
+const deleteAllForm = document.getElementById('delete-all-form');
+const deleteAllCount = document.getElementById('delete-all-count');
+const deleteAllConfirmation = document.getElementById('delete-all-confirmation');
+const deleteAllStatus = document.getElementById('delete-all-status');
+const deleteAllSubmit = document.getElementById('delete-all-submit');
 
 const pinDialog = document.getElementById('pin-dialog');
 const pinValue = document.getElementById('pin-value');
@@ -159,7 +165,7 @@ function focusHeading(id) {
 }
 
 function showLogin(message = '', { focus = false } = {}) {
-  [learnerDialog, pinDialog, recordsDialog, confirmDialog, bulkDialog].forEach((dialog) => {
+  [learnerDialog, pinDialog, recordsDialog, confirmDialog, bulkDialog, deleteAllDialog].forEach((dialog) => {
     if (dialog.open) dialog.close();
   });
   dashboard.hidden = true;
@@ -479,6 +485,44 @@ async function loadLearners() {
     learnersError.hidden = false;
   }
 }
+
+function openDeleteAllDialog() {
+  deleteAllCount.textContent = `${learners.length} learner${learners.length === 1 ? '' : 's'}`;
+  deleteAllForm.reset();
+  deleteAllSubmit.disabled = true;
+  setStatus(deleteAllStatus, '');
+  deleteAllDialog.showModal();
+  deleteAllConfirmation.focus();
+}
+
+deleteAllConfirmation.addEventListener('input', () => {
+  deleteAllSubmit.disabled = deleteAllConfirmation.value !== 'delete all learners';
+});
+
+deleteAllForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  if (deleteAllConfirmation.value !== 'delete all learners') {
+    setStatus(deleteAllStatus, 'Type the exact phrase to continue.');
+    return;
+  }
+  deleteAllSubmit.disabled = true;
+  setStatus(deleteAllStatus, 'Deleting learner records…', 'success');
+  try {
+    const result = await api('/api/admin/learners/bulk-delete', {
+      method: 'DELETE',
+      body: { confirmation: deleteAllConfirmation.value },
+    });
+    deleteAllDialog.close();
+    await loadLearners();
+    toast(`${result.deleted ?? 0} learner${result.deleted === 1 ? '' : 's'} deleted.`);
+  } catch (error) {
+    if (error.status === 401) sessionExpired();
+    else setStatus(deleteAllStatus, errorMessage(error, 'Learners could not be deleted.'));
+    deleteAllSubmit.disabled = false;
+  }
+});
+
+document.getElementById('delete-all-learners').addEventListener('click', openDeleteAllDialog);
 
 function openLearnerForm(learner = null) {
   learnerForm.reset();

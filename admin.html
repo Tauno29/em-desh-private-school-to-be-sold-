@@ -117,6 +117,7 @@
             </div>
             <div class="panel-head-actions">
               <button class="btn btn-ghost" type="button" id="import-learners">Import CSV</button>
+              <button class="btn btn-danger-ghost" type="button" id="delete-all-learners">Delete all</button>
               <button class="btn btn-primary" type="button" id="add-learner">Register learner</button>
             </div>
           </header>
@@ -325,6 +326,30 @@
     </div>
   </dialog>
 
+  <dialog class="sheet" id="delete-all-dialog" aria-labelledby="delete-all-title">
+    <form id="delete-all-form" novalidate>
+      <div class="sheet-head">
+        <div>
+          <p class="card-kicker">Permanent action</p>
+          <h2 id="delete-all-title">Delete all learners?</h2>
+        </div>
+        <button class="icon-btn" type="button" data-close="delete-all-dialog" aria-label="Close">&times;</button>
+      </div>
+      <div class="sheet-body">
+        <p class="danger-notice">This will permanently delete <strong id="delete-all-count">0 learners</strong>, their portal sessions, behaviour notes, test results, report cards and stored report files. This cannot be undone.</p>
+        <div class="field">
+          <label for="delete-all-confirmation">Type <strong>delete all learners</strong> to continue</label>
+          <input class="input" id="delete-all-confirmation" type="text" autocomplete="off" spellcheck="false" required>
+        </div>
+        <p class="form-status" id="delete-all-status" role="status" aria-live="polite"></p>
+      </div>
+      <div class="sheet-foot">
+        <button class="btn btn-ghost" type="button" data-close="delete-all-dialog">Cancel</button>
+        <button class="btn btn-danger" type="submit" id="delete-all-submit" disabled>Delete all learners</button>
+      </div>
+    </form>
+  </dialog>
+
   <dialog class="sheet" id="pin-dialog" aria-labelledby="pin-title">
     <div class="sheet-head">
       <div>
@@ -466,7 +491,7 @@
 
   <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
-  <script src="app.js?v=20261123a" defer></script>
-  <script type="module" src="admin.js?v=20261123a"></script>
+  <script src="app.js?v=20261123b" defer></script>
+  <script type="module" src="admin.js?v=20261123b"></script>
 </body>
 </html>

@@ -76,6 +76,7 @@ const MESSAGES = {
   upload_failed: 'The image upload failed. Please try again.',
   storage_unavailable: 'Photo storage is temporarily unavailable. Please try again.',
   database_unavailable: 'The school records are temporarily unavailable. Please try again.',
+  delete_confirmation_required: 'Type “delete all learners” exactly to confirm this permanent action.',
   student_id_unavailable: 'Could not allocate a student ID. Please try again.',
   pin_unchanged: 'Choose a PIN that is different from your current one.',
   not_found: 'That item no longer exists. Refresh the page.',
