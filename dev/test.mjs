@@ -490,10 +490,15 @@ check('portal logout clears cookie', result.status === 200 && result.setCookie.i
 result = await call('GET', '/api/portal/me', { cookie: freshCookie });
 check('logged-out learner cookie rejected', result.status === 401);
 
-for (let attempt = 1; attempt <= 11; attempt += 1) {
+for (let attempt = 1; attempt <= 5; attempt += 1) {
   result = await call('POST', '/api/admin/login', { body: { password: 'bad-guess' } });
+  check(`admin failure ${attempt} rejected`, result.status === 401 && result.body.error === 'invalid_credentials');
 }
-check('repeated admin failures are throttled', result.status === 429 && result.body.error === 'too_many_attempts');
+const adminThrottle = db.tables.login_throttle.find((row) => row.throttle_key === 'admin');
+const adminLockMs = Date.parse(adminThrottle?.locked_until ?? '') - Date.now();
+check('fifth admin failure creates one-minute lock', adminThrottle?.failed_attempts === 5 && adminLockMs > 0 && adminLockMs <= 60_000);
+result = await call('POST', '/api/admin/login', { body: { password: 'bad-guess' } });
+check('sixth admin attempt is throttled', result.status === 429 && result.body.error === 'too_many_attempts');
 
 for (let attempt = 1; attempt <= 12; attempt += 1) {
   result = await call('POST', '/api/portal/login', { body: { studentId: second.studentId, pin: '000000' } });

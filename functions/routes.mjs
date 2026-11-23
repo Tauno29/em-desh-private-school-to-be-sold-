@@ -11,8 +11,10 @@ const ADMIN_COOKIE = '__Host-omps_admin';
 const LEARNER_COOKIE = '__Host-omps_portal';
 const ADMIN_SESSION_MS = 365 * 24 * 60 * 60 * 1000;
 const LEARNER_SESSION_MS = 8 * 60 * 60 * 1000;
-const THROTTLE_WINDOW_MS = 15 * 60 * 1000;
-const THROTTLE_MAX_ATTEMPTS = 10;
+const ADMIN_THROTTLE_WINDOW_MS = 60 * 1000;
+const ADMIN_THROTTLE_MAX_ATTEMPTS = 5;
+const LEARNER_THROTTLE_WINDOW_MS = 15 * 60 * 1000;
+const LEARNER_THROTTLE_MAX_ATTEMPTS = 10;
 const MAX_BODY_BYTES = 16384;
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
@@ -232,7 +234,7 @@ export function application({ db, storage, BackendError, env }) {
 
   // ---- login throttling -----------------------------------------------------
 
-  async function consumeAttempt(throttleKey) {
+  async function consumeAttempt(throttleKey, { windowMs, maxAttempts }) {
     const now = Date.now();
     const found = rows(await db.from('login_throttle')
       .select('throttle_key,failed_attempts,locked_until').eq('throttle_key', throttleKey).limit(1));
@@ -241,7 +243,7 @@ export function application({ db, storage, BackendError, env }) {
       const created = await db.from('login_throttle').insert({
         throttle_key: throttleKey,
         failed_attempts: 1,
-        locked_until: new Date(now + THROTTLE_WINDOW_MS).toISOString(),
+        locked_until: new Date(now + windowMs).toISOString(),
         updated_at: new Date(now).toISOString(),
       }).select('throttle_key');
       if (created.error) fail('database_unavailable', 503);
@@ -256,17 +258,23 @@ export function application({ db, storage, BackendError, env }) {
     if (now >= windowEnd) {
       const reset = await db.from('login_throttle').update({
         failed_attempts: 1,
-        locked_until: new Date(now + THROTTLE_WINDOW_MS).toISOString(),
+        locked_until: new Date(now + windowMs).toISOString(),
         updated_at: new Date(now).toISOString(),
       }).eq('throttle_key', throttleKey).select('throttle_key');
       if (reset.error) fail('database_unavailable', 503);
       return;
     }
 
-    if (count >= THROTTLE_MAX_ATTEMPTS) fail('too_many_attempts', 429);
+    if (count >= maxAttempts) fail('too_many_attempts', 429);
 
     const updated = await db.from('login_throttle')
-      .update({ failed_attempts: count + 1, updated_at: new Date(now).toISOString() })
+      .update({
+        failed_attempts: count + 1,
+        locked_until: count + 1 >= maxAttempts
+          ? new Date(now + windowMs).toISOString()
+          : row.locked_until,
+        updated_at: new Date(now).toISOString(),
+      })
       .eq('throttle_key', throttleKey).select('throttle_key');
     if (updated.error) fail('database_unavailable', 503);
   }
@@ -566,7 +574,10 @@ export function application({ db, storage, BackendError, env }) {
       if (guardianEmail && !EMAIL.test(guardianEmail)) fail('email_invalid', 400);
       if (body.consent !== true) fail('consent_required', 400);
 
-      await consumeAttempt(`apply:${await sha256Hex(clientAddress(request))}`);
+      await consumeAttempt(`apply:${await sha256Hex(clientAddress(request))}`, {
+        windowMs: LEARNER_THROTTLE_WINDOW_MS,
+        maxAttempts: LEARNER_THROTTLE_MAX_ATTEMPTS,
+      });
       const inserted = await db.from('applications').insert({
         first_name: firstName,
         last_name: lastName,
@@ -601,7 +612,10 @@ export function application({ db, storage, BackendError, env }) {
       const body = await readJson(request, 2048);
       const password = typeof body.password === 'string' ? body.password : '';
       if (!password || password.length > 256) fail('invalid_credentials', 401);
-      await consumeAttempt('admin');
+      await consumeAttempt('admin', {
+        windowMs: ADMIN_THROTTLE_WINDOW_MS,
+        maxAttempts: ADMIN_THROTTLE_MAX_ATTEMPTS,
+      });
       const configured = env.get('ADMIN_PASSWORD') ?? '';
       const matches = constantTimeEqualStrings(await sha256Hex(password), await sha256Hex(configured));
       if (!matches) {
@@ -1072,7 +1086,10 @@ export function application({ db, storage, BackendError, env }) {
       const studentId = clean(body.studentId, 20).toUpperCase();
       const pin = typeof body.pin === 'string' ? body.pin.trim() : '';
       if (!STUDENT_ID.test(studentId) || !PIN.test(pin)) fail('invalid_credentials', 401);
-      await consumeAttempt(`learner:${studentId}`);
+      await consumeAttempt(`learner:${studentId}`, {
+        windowMs: LEARNER_THROTTLE_WINDOW_MS,
+        maxAttempts: LEARNER_THROTTLE_MAX_ATTEMPTS,
+      });
 
       const found = rows(await db.from('learners')
         .select('id,student_id,first_name,last_name,grade,class_name,guardian_name,guardian_phone,status,pin_hash,created_at,updated_at')
@@ -1113,7 +1130,10 @@ export function application({ db, storage, BackendError, env }) {
       const newPinValue = typeof body.newPin === 'string' ? body.newPin.trim() : '';
       if (!PIN.test(currentPin) || !PIN.test(newPinValue)) fail('invalid_input', 400);
       if (currentPin === newPinValue) fail('pin_unchanged', 400);
-      await consumeAttempt(`pin:${learner.id}`);
+      await consumeAttempt(`pin:${learner.id}`, {
+        windowMs: LEARNER_THROTTLE_WINDOW_MS,
+        maxAttempts: LEARNER_THROTTLE_MAX_ATTEMPTS,
+      });
       if (!await verifySecret(currentPin, learner.pin_hash)) fail('invalid_credentials', 401);
       await clearAttempts(`pin:${learner.id}`);
 
