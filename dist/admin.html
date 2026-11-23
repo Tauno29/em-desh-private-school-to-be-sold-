@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=20261120i">
+  <link rel="stylesheet" href="styles.css?v=20261123j">
 </head>
 <body class="app-page dashboard-page">
 
@@ -55,19 +55,39 @@
             <p class="auth-sub">Manage learner registrations, records and applications for Em-Desh English Medium Private School.</p>
           </header>
 
-          <form id="admin-login-form" class="auth-form" novalidate>
-            <div class="field">
-              <label for="admin-password">Dashboard password</label>
-              <input class="input" id="admin-password" type="password" autocomplete="current-password" maxlength="256" required>
-            </div>
-            <button class="btn btn-primary btn-block" type="submit" id="admin-login-submit">Sign in</button>
-            <p class="form-status" id="admin-login-status" role="status" aria-live="polite"></p>
-          </form>
+          <button class="btn btn-primary btn-block" type="button" id="admin-open-code">Enter six-digit code</button>
+          <p class="form-status" id="admin-login-status" role="status" aria-live="polite"></p>
 
-          <p class="help-note">The password is set by the site owner in Site Settings. Only school office staff should use this dashboard.</p>
+          <p class="help-note">Use the six-digit staff code set by the site owner. Only school office staff should use this dashboard.</p>
         </div>
       </div>
     </section>
+
+    <dialog class="code-dialog" id="admin-code-dialog" aria-labelledby="admin-code-title">
+      <form id="admin-login-form" class="code-console" novalidate>
+        <div class="code-console-screen">
+          <div class="code-console-display" id="admin-code-display" aria-live="polite" aria-label="No digits entered">______</div>
+          <span class="code-console-label" id="admin-code-title">STAFF ACCESS</span>
+        </div>
+        <div class="code-console-lights" aria-hidden="true"><span class="light light-red"></span><span class="light light-green"></span></div>
+        <p class="code-console-hint">Enter the six-digit staff code</p>
+        <div class="code-keypad" aria-label="Numeric keypad">
+          <button type="button" class="code-key" data-code-key="1">1</button>
+          <button type="button" class="code-key" data-code-key="2">2</button>
+          <button type="button" class="code-key" data-code-key="3">3</button>
+          <button type="button" class="code-key" data-code-key="4">4</button>
+          <button type="button" class="code-key" data-code-key="5">5</button>
+          <button type="button" class="code-key" data-code-key="6">6</button>
+          <button type="button" class="code-key" data-code-key="7">7</button>
+          <button type="button" class="code-key" data-code-key="8">8</button>
+          <button type="button" class="code-key" data-code-key="9">9</button>
+          <button type="button" class="code-key code-key-cancel" id="admin-code-cancel">CANCEL</button>
+          <button type="button" class="code-key" data-code-key="0">0</button>
+          <button type="submit" class="code-key code-key-enter" id="admin-login-submit">ENTER</button>
+        </div>
+        <p class="form-status code-console-status" id="admin-code-status" role="status" aria-live="polite"></p>
+      </form>
+    </dialog>
 
     <section class="dashboard" id="dashboard" hidden>
       <div class="container">
@@ -115,7 +135,11 @@
               <h2>Registered learners</h2>
               <p class="panel-note">Each registration receives a unique student ID and a six-digit PIN for the learner portal.</p>
             </div>
-            <button class="btn btn-primary" type="button" id="add-learner">Register learner</button>
+            <div class="panel-head-actions">
+              <button class="btn btn-ghost" type="button" id="import-learners">Import CSV</button>
+              <button class="btn btn-danger-ghost" type="button" id="delete-all-learners">Delete all</button>
+              <button class="btn btn-primary" type="button" id="add-learner">Register learner</button>
+            </div>
           </header>
 
           <div class="toolbar">
@@ -281,6 +305,71 @@
     </form>
   </dialog>
 
+  <dialog class="sheet sheet-wide" id="bulk-dialog" aria-labelledby="bulk-title">
+    <div class="sheet-head">
+      <div>
+        <p class="card-kicker" id="bulk-kicker">Bulk registration</p>
+        <h2 id="bulk-title">Import learners from CSV</h2>
+        <p class="records-sub">Review every row before saving. No records are created until you confirm the import.</p>
+      </div>
+      <button class="icon-btn" type="button" data-close="bulk-dialog" aria-label="Close">&times;</button>
+    </div>
+    <div class="sheet-body" id="bulk-setup">
+      <div class="bulk-instructions">
+        <p><strong>One learner per row.</strong> First name, last name and grade are required. Class, guardian name and guardian phone are optional.</p>
+        <p class="field-hint">Grades can be KG, Kindergarten, Pre-Primary, or 1–7. Use the template to avoid column-name mistakes.</p>
+      </div>
+      <div class="bulk-actions">
+        <button class="btn btn-ghost" type="button" id="download-template">Download CSV template</button>
+        <label class="btn btn-primary file-button" for="bulk-file">Choose completed CSV<input type="file" id="bulk-file" accept=".csv,text/csv" hidden></label>
+      </div>
+      <p class="form-status" id="bulk-status" role="status" aria-live="polite"></p>
+      <div class="bulk-summary" id="bulk-summary" hidden></div>
+      <div class="bulk-preview-wrap" id="bulk-preview-wrap" hidden>
+        <div class="bulk-preview-head">
+          <h3>Import preview</h3>
+          <p class="field-hint">Rows marked “Ready” will be registered. Fix other rows in the spreadsheet and select it again.</p>
+        </div>
+        <div class="bulk-preview" id="bulk-preview"></div>
+      </div>
+    </div>
+    <div class="sheet-body bulk-results" id="bulk-results" hidden>
+      <div class="bulk-summary" id="bulk-result-summary"></div>
+      <p class="notice">These PINs are shown only once. Print or save this sheet securely before closing.</p>
+      <div class="credentials-list" id="bulk-credentials"></div>
+      <p class="panel-error" id="bulk-failures" hidden></p>
+    </div>
+    <div class="sheet-foot">
+      <button class="btn btn-ghost" type="button" data-close="bulk-dialog" id="bulk-close">Cancel</button>
+      <button class="btn btn-ghost" type="button" id="bulk-print" hidden>Print credentials</button>
+      <button class="btn btn-primary" type="button" id="bulk-import" disabled>Register ready learners</button>
+    </div>
+  </dialog>
+
+  <dialog class="sheet" id="delete-all-dialog" aria-labelledby="delete-all-title">
+    <form id="delete-all-form" novalidate>
+      <div class="sheet-head">
+        <div>
+          <p class="card-kicker">Permanent action</p>
+          <h2 id="delete-all-title">Delete all learners?</h2>
+        </div>
+        <button class="icon-btn" type="button" data-close="delete-all-dialog" aria-label="Close">&times;</button>
+      </div>
+      <div class="sheet-body">
+        <p class="danger-notice">This will permanently delete <strong id="delete-all-count">0 learners</strong>, their portal sessions, behaviour notes, test results, report cards and stored report files. This cannot be undone.</p>
+        <div class="field">
+          <label for="delete-all-confirmation">Type <strong>delete all learners</strong> to continue</label>
+          <input class="input" id="delete-all-confirmation" type="text" autocomplete="off" spellcheck="false" required>
+        </div>
+        <p class="form-status" id="delete-all-status" role="status" aria-live="polite"></p>
+      </div>
+      <div class="sheet-foot">
+        <button class="btn btn-ghost" type="button" data-close="delete-all-dialog">Cancel</button>
+        <button class="btn btn-danger" type="submit" id="delete-all-submit" disabled>Delete all learners</button>
+      </div>
+    </form>
+  </dialog>
+
   <dialog class="sheet" id="pin-dialog" aria-labelledby="pin-title">
     <div class="sheet-head">
       <div>
@@ -422,7 +511,7 @@
 
   <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
-  <script src="app.js?v=20261120i" defer></script>
-  <script type="module" src="admin.js?v=20261120i"></script>
+  <script src="app.js?v=20261123b" defer></script>
+  <script type="module" src="admin.js?v=20261123c"></script>
 </body>
 </html>

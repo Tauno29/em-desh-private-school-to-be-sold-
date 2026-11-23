@@ -29,6 +29,11 @@ restoreToken();
 const loginSection = document.getElementById('admin-login');
 const loginForm = document.getElementById('admin-login-form');
 const loginStatus = document.getElementById('admin-login-status');
+const codeDialog = document.getElementById('admin-code-dialog');
+const codeDisplay = document.getElementById('admin-code-display');
+const codeStatus = document.getElementById('admin-code-status');
+const openCodeButton = document.getElementById('admin-open-code');
+const cancelCodeButton = document.getElementById('admin-code-cancel');
 const loginSubmit = document.getElementById('admin-login-submit');
 const dashboard = document.getElementById('dashboard');
 const signoutButton = document.getElementById('admin-signout');
@@ -145,6 +150,7 @@ let records = { behavior: [], tests: [], reportCards: [] };
 let bulkRows = [];
 let bulkCredentialsData = [];
 let bulkNeedsLogin = false;
+let adminCode = '';
 
 function setStatus(node, message, tone = 'error') {
   node.textContent = message;
@@ -168,10 +174,14 @@ function showLogin(message = '', { focus = false } = {}) {
   [learnerDialog, pinDialog, recordsDialog, confirmDialog, bulkDialog, deleteAllDialog].forEach((dialog) => {
     if (dialog.open) dialog.close();
   });
+  if (codeDialog.open) codeDialog.close();
   dashboard.hidden = true;
   loginSection.hidden = false;
   loginForm.reset();
+  adminCode = '';
+  updateCodeDisplay();
   setStatus(loginStatus, message);
+  setStatus(codeStatus, '');
   if (focus) focusHeading('admin-login-title');
 }
 
@@ -258,21 +268,70 @@ async function checkSession() {
   }
 }
 
+function updateCodeDisplay() {
+  const masked = `${'•'.repeat(adminCode.length)}${'_'.repeat(6 - adminCode.length)}`;
+  codeDisplay.textContent = masked;
+  codeDisplay.setAttribute('aria-label', adminCode.length ? `${adminCode.length} of 6 digits entered` : 'No digits entered');
+}
+
+function resetCodeEntry() {
+  adminCode = '';
+  updateCodeDisplay();
+  setStatus(codeStatus, '');
+}
+
+openCodeButton.addEventListener('click', () => {
+  resetCodeEntry();
+  codeDialog.showModal();
+  document.querySelector('.code-key')?.focus();
+});
+
+cancelCodeButton.addEventListener('click', () => {
+  codeDialog.close();
+  resetCodeEntry();
+});
+
+document.querySelectorAll('[data-code-key]').forEach((button) => {
+  button.addEventListener('click', () => {
+    if (adminCode.length >= 6) return;
+    adminCode += button.dataset.codeKey;
+    updateCodeDisplay();
+  });
+});
+
+loginForm.addEventListener('keydown', (event) => {
+  if (/^\d$/.test(event.key)) {
+    event.preventDefault();
+    document.querySelector(`[data-code-key="${event.key}"]`)?.click();
+  } else if (event.key === 'Backspace') {
+    event.preventDefault();
+    adminCode = adminCode.slice(0, -1);
+    updateCodeDisplay();
+  }
+});
+
 loginForm.addEventListener('submit', async (event) => {
   event.preventDefault();
-  if (!loginForm.reportValidity()) return;
-  const password = document.getElementById('admin-password').value;
+  if (!/^\d{6}$/.test(adminCode)) {
+    setStatus(codeStatus, 'Enter all six digits before pressing Enter.');
+    return;
+  }
   loginSubmit.disabled = true;
-  setStatus(loginStatus, 'Signing in…', 'success');
+  setStatus(codeStatus, 'Checking code…', 'success');
+  setStatus(loginStatus, '');
   try {
-    const data = await api('/api/admin/login', { method: 'POST', body: { password } });
+    const data = await api('/api/admin/login', { method: 'POST', body: { code: adminCode } });
     if (data?.token) persistToken(data.token);
     loginForm.reset();
+    adminCode = '';
+    updateCodeDisplay();
     setStatus(loginStatus, '');
+    setStatus(codeStatus, '');
+    codeDialog.close();
     showDashboard({ focus: true });
     await refreshAll();
   } catch (error) {
-    setStatus(loginStatus, errorMessage(error));
+    setStatus(codeStatus, errorMessage(error));
   } finally {
     loginSubmit.disabled = false;
   }

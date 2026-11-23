@@ -19,7 +19,7 @@ const handle = application({
   db,
   storage,
   BackendError,
-  env: { get: (name) => (name === 'ADMIN_PASSWORD' ? 'school-test-123' : undefined) },
+  env: { get: (name) => (name === 'ADMIN_CODE' ? '123456' : undefined) },
 });
 
 // Seed a learner and two gallery photos for local visual checks only.
@@ -217,6 +217,6 @@ const server = createServer(async (req, res) => {
 const port = Number(process.env.PORT ?? 4173);
 server.listen(port, '0.0.0.0', () => {
   console.log(`Preview: http://localhost:${port}/`);
-  console.log('Admin password (local only): school-test-123');
+  console.log('Admin code (local only): 123456');
   console.log('Seeded learner: OMPS-2026-001 / PIN 482915');
 });

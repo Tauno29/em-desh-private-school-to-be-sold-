@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=20261120i">
+  <link rel="stylesheet" href="styles.css?v=20261123j">
 </head>
 <body class="app-page dashboard-page">
 
@@ -55,19 +55,39 @@
             <p class="auth-sub">Manage learner registrations, records and applications for Em-Desh English Medium Private School.</p>
           </header>
 
-          <form id="admin-login-form" class="auth-form" novalidate>
-            <div class="field">
-              <label for="admin-password">Dashboard password</label>
-              <input class="input" id="admin-password" type="password" autocomplete="current-password" maxlength="256" required>
-            </div>
-            <button class="btn btn-primary btn-block" type="submit" id="admin-login-submit">Sign in</button>
-            <p class="form-status" id="admin-login-status" role="status" aria-live="polite"></p>
-          </form>
+          <button class="btn btn-primary btn-block" type="button" id="admin-open-code">Enter six-digit code</button>
+          <p class="form-status" id="admin-login-status" role="status" aria-live="polite"></p>
 
-          <p class="help-note">The password is set by the site owner in Site Settings. Only school office staff should use this dashboard.</p>
+          <p class="help-note">Use the six-digit staff code set by the site owner. Only school office staff should use this dashboard.</p>
         </div>
       </div>
     </section>
+
+    <dialog class="code-dialog" id="admin-code-dialog" aria-labelledby="admin-code-title">
+      <form id="admin-login-form" class="code-console" novalidate>
+        <div class="code-console-screen">
+          <div class="code-console-display" id="admin-code-display" aria-live="polite" aria-label="No digits entered">______</div>
+          <span class="code-console-label" id="admin-code-title">STAFF ACCESS</span>
+        </div>
+        <div class="code-console-lights" aria-hidden="true"><span class="light light-red"></span><span class="light light-green"></span></div>
+        <p class="code-console-hint">Enter the six-digit staff code</p>
+        <div class="code-keypad" aria-label="Numeric keypad">
+          <button type="button" class="code-key" data-code-key="1">1</button>
+          <button type="button" class="code-key" data-code-key="2">2</button>
+          <button type="button" class="code-key" data-code-key="3">3</button>
+          <button type="button" class="code-key" data-code-key="4">4</button>
+          <button type="button" class="code-key" data-code-key="5">5</button>
+          <button type="button" class="code-key" data-code-key="6">6</button>
+          <button type="button" class="code-key" data-code-key="7">7</button>
+          <button type="button" class="code-key" data-code-key="8">8</button>
+          <button type="button" class="code-key" data-code-key="9">9</button>
+          <button type="button" class="code-key code-key-cancel" id="admin-code-cancel">CANCEL</button>
+          <button type="button" class="code-key" data-code-key="0">0</button>
+          <button type="submit" class="code-key code-key-enter" id="admin-login-submit">ENTER</button>
+        </div>
+        <p class="form-status code-console-status" id="admin-code-status" role="status" aria-live="polite"></p>
+      </form>
+    </dialog>
 
     <section class="dashboard" id="dashboard" hidden>
       <div class="container">
@@ -492,6 +512,6 @@
   <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
   <script src="app.js?v=20261123b" defer></script>
-  <script type="module" src="admin.js?v=20261123b"></script>
+  <script type="module" src="admin.js?v=20261123c"></script>
 </body>
 </html>

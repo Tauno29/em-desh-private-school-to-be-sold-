@@ -1860,6 +1860,68 @@ select.input {
   width: min(460px, 100%);
 }
 
+.code-dialog {
+  width: min(360px, calc(100% - 28px));
+  padding: 0;
+  border: 0;
+  border-radius: 24px;
+  background: transparent;
+  color: #1d2422;
+  box-shadow: 0 24px 70px rgba(13, 27, 20, 0.35);
+}
+
+.code-dialog::backdrop { background: rgba(11, 30, 20, 0.62); backdrop-filter: blur(3px); }
+
+.code-console {
+  padding: 24px 22px 22px;
+  border: 1px solid #89908b;
+  border-radius: 24px;
+  background: linear-gradient(135deg, #dfe2df 0%, #aeb5b1 46%, #d9ddda 100%);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.8), inset 0 -10px 20px rgba(42,54,48,.12);
+}
+
+.code-console-screen {
+  display: grid;
+  gap: 5px;
+  padding: 11px 14px 8px;
+  border: 4px solid #707773;
+  background: #302a69;
+  box-shadow: inset 0 0 0 2px #171737, 0 2px 2px rgba(0,0,0,.25);
+  color: #ddd8ff;
+  text-align: center;
+}
+
+.code-console-display {
+  min-height: 1.3em;
+  font: 700 1.5rem/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: .18em;
+  text-shadow: 0 0 8px rgba(190,184,255,.8);
+}
+
+.code-console-label { font-size: .65rem; font-weight: 700; letter-spacing: .2em; }
+.code-console-lights { display: flex; justify-content: center; gap: 42px; padding: 11px 0 3px; }
+.light { width: 17px; height: 17px; border: 2px solid rgba(0,0,0,.35); border-radius: 50%; box-shadow: inset 0 1px 2px rgba(255,255,255,.8), 0 1px 3px rgba(0,0,0,.3); }
+.light-red { background: #cf302d; }
+.light-green { background: #39b84a; }
+.code-console-hint { margin: 7px 0 13px; font-size: .78rem; text-align: center; color: #3f4944; }
+
+.code-keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 9px; }
+.code-key {
+  min-height: 42px;
+  border: 1px solid #8a908c;
+  border-radius: 5px;
+  background: linear-gradient(#f5f6f5, #bcc2be);
+  color: #303834;
+  font: 600 .95rem/1 Inter, sans-serif;
+  box-shadow: 0 2px 0 #737a75, inset 0 1px 0 rgba(255,255,255,.8);
+  cursor: pointer;
+}
+.code-key:hover { filter: brightness(1.04); }
+.code-key:active { transform: translateY(2px); box-shadow: 0 0 0 #737a75, inset 0 1px 0 rgba(255,255,255,.8); }
+.code-key-cancel { background: linear-gradient(#dca6a4, #a75d5b); color: #3d2020; font-size: .68rem; }
+.code-key-enter { background: linear-gradient(#a9d5a9, #5c9d63); color: #183a1c; font-size: .68rem; }
+.code-console-status { min-height: 1.3em; margin: 14px 0 0; text-align: center; }
+
 .dashboard {
   padding-block: calc(clamp(28px, 4vw, 44px) * var(--site-space, 1)) calc(clamp(56px, 8vw, 96px) * var(--site-space, 1));
 }

@@ -1,5 +1,5 @@
 // Application API for the learner portal, admin dashboard and gallery.
-// Identity is application-owned: admin from the ADMIN_PASSWORD secret, learners from
+// Identity is application-owned: admin from the ADMIN_CODE secret, learners from
 // student ID + school-issued PIN. No platform user context is used.
 import {
   clearCookie, constantTimeEqualStrings, hashSecret, newPin, newSessionToken,
@@ -608,16 +608,16 @@ export function application({ db, storage, BackendError, env }) {
     }
 
     if (path === '/api/admin/login' && is('POST')) {
-      if (!env.get('ADMIN_PASSWORD')) fail('service_not_configured', 503);
+      if (!env.get('ADMIN_CODE')) fail('service_not_configured', 503);
       const body = await readJson(request, 2048);
-      const password = typeof body.password === 'string' ? body.password : '';
-      if (!password || password.length > 256) fail('invalid_credentials', 401);
+      const code = typeof body.code === 'string' ? body.code : '';
+      if (!/^\d{6}$/.test(code)) fail('invalid_credentials', 401);
       await consumeAttempt('admin', {
         windowMs: ADMIN_THROTTLE_WINDOW_MS,
         maxAttempts: ADMIN_THROTTLE_MAX_ATTEMPTS,
       });
-      const configured = env.get('ADMIN_PASSWORD') ?? '';
-      const matches = constantTimeEqualStrings(await sha256Hex(password), await sha256Hex(configured));
+      const configured = env.get('ADMIN_CODE') ?? '';
+      const matches = constantTimeEqualStrings(await sha256Hex(code), await sha256Hex(configured));
       if (!matches) {
         await new Promise((resolve) => setTimeout(resolve, 350));
         fail('invalid_credentials', 401);

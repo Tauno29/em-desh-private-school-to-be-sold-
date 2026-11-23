@@ -10,7 +10,7 @@ const db = createFakeDb();
 const storage = createFakeStorage();
 const handle = application({
   db, storage, BackendError,
-  env: { get: (name) => (name === 'ADMIN_PASSWORD' ? 'test-secret-123' : undefined) },
+  env: { get: (name) => (name === 'ADMIN_CODE' ? '123456' : undefined) },
 });
 
 let passed = 0;
@@ -50,10 +50,10 @@ result = await call('GET', '/api/gallery');
 check('public gallery starts empty', result.status === 200 && result.body.items.length === 0);
 
 console.log('--- admin auth ---');
-result = await call('POST', '/api/admin/login', { body: { password: 'wrong' } });
-check('wrong admin password rejected', result.status === 401 && result.body.error === 'invalid_credentials');
+result = await call('POST', '/api/admin/login', { body: { code: '000000' } });
+check('wrong admin code rejected', result.status === 401 && result.body.error === 'invalid_credentials');
 
-result = await call('POST', '/api/admin/login', { body: { password: 'test-secret-123' } });
+result = await call('POST', '/api/admin/login', { body: { code: '123456' } });
 const adminCookie = cookiePair(result.setCookie);
 check('admin login sets session cookie', result.status === 200 && /^__Host-omps_admin=[A-Za-z0-9_-]{43}$/.test(adminCookie ?? ''), JSON.stringify(result.body));
 
@@ -63,7 +63,7 @@ check('admin route without cookie rejected', result.status === 401);
 result = await call('GET', '/api/admin/me', { cookie: adminCookie });
 check('admin session accepted', result.status === 200 && result.body.role === 'admin');
 
-result = await call('POST', '/api/admin/login', { body: { password: 'test-secret-123' } });
+result = await call('POST', '/api/admin/login', { body: { code: '123456' } });
 const adminBearer = result.body?.token;
 check('login returns bearer token', /^[A-Za-z0-9_-]{43}$/.test(adminBearer ?? ''));
 
@@ -79,7 +79,7 @@ check('bearer logout ends session', result.status === 401);
 result = await call('GET', '/api/admin/me', { headers: { authorization: 'Bearer not-a-token' } });
 check('malformed bearer token rejected', result.status === 401);
 
-result = await call('POST', '/api/admin/login', { body: { password: 'test-secret-123' } });
+result = await call('POST', '/api/admin/login', { body: { code: '123456' } });
 const queryToken = result.body?.token;
 result = await call('GET', `/api/admin/me?s=${queryToken}`);
 check('query session accepted without cookie or header', result.status === 200 && result.body.role === 'admin');
@@ -87,36 +87,36 @@ check('query session accepted without cookie or header', result.status === 200 &
 result = await call('GET', '/api/admin/me?s=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA');
 check('unknown query token rejected', result.status === 401);
 
-result = await call('POST', '/api/admin/login', { body: { password: 'test-secret-123' }, origin: 'http://evil.example' });
+result = await call('POST', '/api/admin/login', { body: { code: '123456' }, origin: 'http://evil.example' });
 check('cross-origin admin POST rejected', result.status === 403 && result.body.error === 'origin_forbidden');
 
 result = await call('POST', '/api/admin/login', {
-  body: { password: 'test-secret-123' },
+  body: { code: '123456' },
   origin: 'https://emdeshprivateschool-wx7u4fclyzp.qoder.website',
 });
 check('published site origin accepted', result.status === 200, `${result.status} ${JSON.stringify(result.body)}`);
 
 result = await call('POST', '/api/admin/login', {
-  body: { password: 'test-secret-123' },
+  body: { code: '123456' },
   origin: 'https://oshikuku-mission-school-wx7u4fclyzp.qoder.website',
 });
 check('renamed-away site origin still accepted under owner suffix', result.status === 200, `${result.status} ${JSON.stringify(result.body)}`);
 
 result = await call('POST', '/api/admin/login', {
-  body: { password: 'test-secret-123' },
+  body: { code: '123456' },
   origin: 'http://emdeshprivateschool-wx7u4fclyzp.qoder.website',
 });
 check('plaintext http site origin rejected', result.status === 403 && result.body.error === 'origin_forbidden', `${result.status} ${JSON.stringify(result.body)}`);
 
 result = await call('POST', '/api/admin/login', {
-  body: { password: 'test-secret-123' },
+  body: { code: '123456' },
   origin: 'https://school.example',
   headers: { 'x-forwarded-host': 'school.example', 'x-forwarded-proto': 'https' },
 });
 check('gateway forwarded origin accepted', result.status === 200, `${result.status} ${JSON.stringify(result.body)}`);
 
 result = await call('POST', '/api/admin/login', {
-  body: { password: 'test-secret-123' },
+  body: { code: '123456' },
   origin: 'https://oshikuku-mission-school-wx7u4fclyzp.qoder.website',
   headers: { 'sec-fetch-site': 'cross-site' },
 });
@@ -491,13 +491,13 @@ result = await call('GET', '/api/portal/me', { cookie: freshCookie });
 check('logged-out learner cookie rejected', result.status === 401);
 
 for (let attempt = 1; attempt <= 5; attempt += 1) {
-  result = await call('POST', '/api/admin/login', { body: { password: 'bad-guess' } });
+  result = await call('POST', '/api/admin/login', { body: { code: '000000' } });
   check(`admin failure ${attempt} rejected`, result.status === 401 && result.body.error === 'invalid_credentials');
 }
 const adminThrottle = db.tables.login_throttle.find((row) => row.throttle_key === 'admin');
 const adminLockMs = Date.parse(adminThrottle?.locked_until ?? '') - Date.now();
 check('fifth admin failure creates one-minute lock', adminThrottle?.failed_attempts === 5 && adminLockMs > 0 && adminLockMs <= 60_000);
-result = await call('POST', '/api/admin/login', { body: { password: 'bad-guess' } });
+result = await call('POST', '/api/admin/login', { body: { code: '000000' } });
 check('sixth admin attempt is throttled', result.status === 429 && result.body.error === 'too_many_attempts');
 
 for (let attempt = 1; attempt <= 12; attempt += 1) {

@@ -29,6 +29,11 @@ restoreToken();
 const loginSection = document.getElementById('admin-login');
 const loginForm = document.getElementById('admin-login-form');
 const loginStatus = document.getElementById('admin-login-status');
+const codeDialog = document.getElementById('admin-code-dialog');
+const codeDisplay = document.getElementById('admin-code-display');
+const codeStatus = document.getElementById('admin-code-status');
+const openCodeButton = document.getElementById('admin-open-code');
+const cancelCodeButton = document.getElementById('admin-code-cancel');
 const loginSubmit = document.getElementById('admin-login-submit');
 const dashboard = document.getElementById('dashboard');
 const signoutButton = document.getElementById('admin-signout');
@@ -44,6 +49,27 @@ const learnerGrade = document.getElementById('learner-grade');
 const learnerClass = document.getElementById('learner-class');
 const learnerGuardian = document.getElementById('learner-guardian');
 const learnerPhone = document.getElementById('learner-phone');
+
+const bulkDialog = document.getElementById('bulk-dialog');
+const bulkSetup = document.getElementById('bulk-setup');
+const bulkResults = document.getElementById('bulk-results');
+const bulkFile = document.getElementById('bulk-file');
+const bulkStatus = document.getElementById('bulk-status');
+const bulkSummary = document.getElementById('bulk-summary');
+const bulkPreviewWrap = document.getElementById('bulk-preview-wrap');
+const bulkPreview = document.getElementById('bulk-preview');
+const bulkImport = document.getElementById('bulk-import');
+const bulkClose = document.getElementById('bulk-close');
+const bulkPrint = document.getElementById('bulk-print');
+const bulkResultSummary = document.getElementById('bulk-result-summary');
+const bulkCredentials = document.getElementById('bulk-credentials');
+const bulkFailures = document.getElementById('bulk-failures');
+const deleteAllDialog = document.getElementById('delete-all-dialog');
+const deleteAllForm = document.getElementById('delete-all-form');
+const deleteAllCount = document.getElementById('delete-all-count');
+const deleteAllConfirmation = document.getElementById('delete-all-confirmation');
+const deleteAllStatus = document.getElementById('delete-all-status');
+const deleteAllSubmit = document.getElementById('delete-all-submit');
 
 const pinDialog = document.getElementById('pin-dialog');
 const pinValue = document.getElementById('pin-value');
@@ -121,6 +147,10 @@ let toastTimer = null;
 let confirmResolve = null;
 let recordsLearner = null;
 let records = { behavior: [], tests: [], reportCards: [] };
+let bulkRows = [];
+let bulkCredentialsData = [];
+let bulkNeedsLogin = false;
+let adminCode = '';
 
 function setStatus(node, message, tone = 'error') {
   node.textContent = message;
@@ -141,13 +171,17 @@ function focusHeading(id) {
 }
 
 function showLogin(message = '', { focus = false } = {}) {
-  [learnerDialog, pinDialog, recordsDialog, confirmDialog].forEach((dialog) => {
+  [learnerDialog, pinDialog, recordsDialog, confirmDialog, bulkDialog, deleteAllDialog].forEach((dialog) => {
     if (dialog.open) dialog.close();
   });
+  if (codeDialog.open) codeDialog.close();
   dashboard.hidden = true;
   loginSection.hidden = false;
   loginForm.reset();
+  adminCode = '';
+  updateCodeDisplay();
   setStatus(loginStatus, message);
+  setStatus(codeStatus, '');
   if (focus) focusHeading('admin-login-title');
 }
 
@@ -234,21 +268,70 @@ async function checkSession() {
   }
 }
 
+function updateCodeDisplay() {
+  const masked = `${'•'.repeat(adminCode.length)}${'_'.repeat(6 - adminCode.length)}`;
+  codeDisplay.textContent = masked;
+  codeDisplay.setAttribute('aria-label', adminCode.length ? `${adminCode.length} of 6 digits entered` : 'No digits entered');
+}
+
+function resetCodeEntry() {
+  adminCode = '';
+  updateCodeDisplay();
+  setStatus(codeStatus, '');
+}
+
+openCodeButton.addEventListener('click', () => {
+  resetCodeEntry();
+  codeDialog.showModal();
+  document.querySelector('.code-key')?.focus();
+});
+
+cancelCodeButton.addEventListener('click', () => {
+  codeDialog.close();
+  resetCodeEntry();
+});
+
+document.querySelectorAll('[data-code-key]').forEach((button) => {
+  button.addEventListener('click', () => {
+    if (adminCode.length >= 6) return;
+    adminCode += button.dataset.codeKey;
+    updateCodeDisplay();
+  });
+});
+
+loginForm.addEventListener('keydown', (event) => {
+  if (/^\d$/.test(event.key)) {
+    event.preventDefault();
+    document.querySelector(`[data-code-key="${event.key}"]`)?.click();
+  } else if (event.key === 'Backspace') {
+    event.preventDefault();
+    adminCode = adminCode.slice(0, -1);
+    updateCodeDisplay();
+  }
+});
+
 loginForm.addEventListener('submit', async (event) => {
   event.preventDefault();
-  if (!loginForm.reportValidity()) return;
-  const password = document.getElementById('admin-password').value;
+  if (!/^\d{6}$/.test(adminCode)) {
+    setStatus(codeStatus, 'Enter all six digits before pressing Enter.');
+    return;
+  }
   loginSubmit.disabled = true;
-  setStatus(loginStatus, 'Signing in…', 'success');
+  setStatus(codeStatus, 'Checking code…', 'success');
+  setStatus(loginStatus, '');
   try {
-    const data = await api('/api/admin/login', { method: 'POST', body: { password } });
+    const data = await api('/api/admin/login', { method: 'POST', body: { code: adminCode } });
     if (data?.token) persistToken(data.token);
     loginForm.reset();
+    adminCode = '';
+    updateCodeDisplay();
     setStatus(loginStatus, '');
+    setStatus(codeStatus, '');
+    codeDialog.close();
     showDashboard({ focus: true });
     await refreshAll();
   } catch (error) {
-    setStatus(loginStatus, errorMessage(error));
+    setStatus(codeStatus, errorMessage(error));
   } finally {
     loginSubmit.disabled = false;
   }
@@ -462,6 +545,44 @@ async function loadLearners() {
   }
 }
 
+function openDeleteAllDialog() {
+  deleteAllCount.textContent = `${learners.length} learner${learners.length === 1 ? '' : 's'}`;
+  deleteAllForm.reset();
+  deleteAllSubmit.disabled = true;
+  setStatus(deleteAllStatus, '');
+  deleteAllDialog.showModal();
+  deleteAllConfirmation.focus();
+}
+
+deleteAllConfirmation.addEventListener('input', () => {
+  deleteAllSubmit.disabled = deleteAllConfirmation.value !== 'delete all learners';
+});
+
+deleteAllForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  if (deleteAllConfirmation.value !== 'delete all learners') {
+    setStatus(deleteAllStatus, 'Type the exact phrase to continue.');
+    return;
+  }
+  deleteAllSubmit.disabled = true;
+  setStatus(deleteAllStatus, 'Deleting learner records…', 'success');
+  try {
+    const result = await api('/api/admin/learners/bulk-delete', {
+      method: 'DELETE',
+      body: { confirmation: deleteAllConfirmation.value },
+    });
+    deleteAllDialog.close();
+    await loadLearners();
+    toast(`${result.deleted ?? 0} learner${result.deleted === 1 ? '' : 's'} deleted.`);
+  } catch (error) {
+    if (error.status === 401) sessionExpired();
+    else setStatus(deleteAllStatus, errorMessage(error, 'Learners could not be deleted.'));
+    deleteAllSubmit.disabled = false;
+  }
+});
+
+document.getElementById('delete-all-learners').addEventListener('click', openDeleteAllDialog);
+
 function openLearnerForm(learner = null) {
   learnerForm.reset();
   setStatus(learnerStatus, '');
@@ -515,6 +636,247 @@ learnerForm.addEventListener('submit', async (event) => {
   } finally {
     learnerSubmit.disabled = false;
   }
+});
+
+// ---- bulk learner import ----------------------------------------------------
+
+const BULK_HEADERS = {
+  firstName: ['firstname', 'first', 'givenname'],
+  lastName: ['lastname', 'last', 'surname', 'familyname'],
+  grade: ['grade', 'year', 'level'],
+  className: ['class', 'classname', 'stream'],
+  guardianName: ['guardianname', 'guardian', 'parentname'],
+  guardianPhone: ['guardianphone', 'phone', 'guardiancontact', 'contact'],
+};
+
+function csvCell(value) {
+  const text = String(value ?? '');
+  return /[",\n\r]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
+}
+
+function downloadCsv(filename, rows) {
+  const blob = new Blob([rows.map((row) => row.map(csvCell).join(',')).join('\r\n') + '\r\n'], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function parseCsv(text) {
+  const rows = [];
+  let row = [];
+  let value = '';
+  let quoted = false;
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index];
+    if (quoted) {
+      if (char === '"' && text[index + 1] === '"') { value += '"'; index += 1; }
+      else if (char === '"') quoted = false;
+      else value += char;
+    } else if (char === '"') quoted = true;
+    else if (char === ',') { row.push(value); value = ''; }
+    else if (char === '\n' || char === '\r') {
+      if (char === '\r' && text[index + 1] === '\n') index += 1;
+      row.push(value); value = '';
+      if (row.some((cell) => cell.trim())) rows.push(row);
+      row = [];
+    } else value += char;
+  }
+  if (quoted) throw new Error('unterminated_csv_quote');
+  if (value || row.length) { row.push(value); if (row.some((cell) => cell.trim())) rows.push(row); }
+  return rows;
+}
+
+function headerKey(value) {
+  return String(value ?? '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+function normalizeBulkGrade(value) {
+  const text = String(value ?? '').trim().toLowerCase();
+  if (['kg', 'k', 'kindergarten', 'pre-primary', 'preprimary'].includes(text)) return 'KG';
+  const match = /^(?:grade\s*)?([1-7])$/.exec(text);
+  return match ? match[1] : '';
+}
+
+function findHeaderIndexes(headers) {
+  const indexes = {};
+  headers.forEach((header, index) => {
+    const key = headerKey(header);
+    for (const [field, aliases] of Object.entries(BULK_HEADERS)) {
+      if (aliases.includes(key) && indexes[field] === undefined) indexes[field] = index;
+    }
+  });
+  return indexes;
+}
+
+function learnerDuplicateKey(row) {
+  return `${row.firstName}|${row.lastName}|${row.grade}`.toLowerCase().replace(/\s+/g, ' ').trim();
+}
+
+function validateBulkRows(rows) {
+  if (!rows.length) return { rows: [], headerError: 'The CSV file is empty.' };
+  const indexes = findHeaderIndexes(rows[0]);
+  const missing = ['firstName', 'lastName', 'grade'].filter((field) => indexes[field] === undefined);
+  if (missing.length) return { rows: [], headerError: `Missing required column${missing.length > 1 ? 's' : ''}: ${missing.join(', ')}.` };
+  const seen = new Set(learners.map((learner) => learnerDuplicateKey({ firstName: learner.firstName, lastName: learner.lastName, grade: learner.grade })));
+  const fileSeen = new Set();
+  const result = [];
+  rows.slice(1).forEach((cells, offset) => {
+    const row = { rowNumber: offset + 2, firstName: cells[indexes.firstName]?.trim() ?? '', lastName: cells[indexes.lastName]?.trim() ?? '', grade: normalizeBulkGrade(cells[indexes.grade]), className: cells[indexes.className]?.trim() ?? '', guardianName: cells[indexes.guardianName]?.trim() ?? '', guardianPhone: cells[indexes.guardianPhone]?.trim() ?? '', errors: [] };
+    if (!row.firstName) row.errors.push('first name is required');
+    if (!row.lastName) row.errors.push('last name is required');
+    if (!row.grade) row.errors.push('grade must be KG or 1–7');
+    if (row.firstName.length > 80 || row.lastName.length > 80) row.errors.push('name is too long');
+    if (row.className.length > 20) row.errors.push('class is too long');
+    if (row.guardianName.length > 100) row.errors.push('guardian name is too long');
+    if (row.guardianPhone.length > 40) row.errors.push('guardian phone is too long');
+    if (row.firstName && row.lastName && row.grade) {
+      const key = learnerDuplicateKey(row);
+      if (seen.has(key)) row.errors.push('already registered');
+      else if (fileSeen.has(key)) row.errors.push('duplicate in this file');
+      fileSeen.add(key);
+    }
+    row.ready = row.errors.length === 0;
+    result.push(row);
+  });
+  return { rows: result };
+}
+
+function renderBulkSummary(rows) {
+  const ready = rows.filter((row) => row.ready).length;
+  const problems = rows.length - ready;
+  bulkSummary.innerHTML = `<span class="bulk-chip bulk-chip-ready">${ready} ready</span><span class="bulk-chip ${problems ? 'bulk-chip-error' : ''}">${problems} need attention</span><span class="bulk-chip">${rows.length} total</span>`;
+  bulkSummary.hidden = false;
+  bulkImport.disabled = ready === 0;
+  bulkImport.textContent = ready ? `Register ${ready} learner${ready === 1 ? '' : 's'}` : 'Register ready learners';
+}
+
+function renderBulkPreview(rows) {
+  const table = document.createElement('table');
+  table.className = 'data-table bulk-table';
+  table.innerHTML = '<thead><tr><th>Row</th><th>Learner</th><th>Grade</th><th>Class</th><th>Guardian</th><th>Status</th></tr></thead>';
+  const body = document.createElement('tbody');
+  rows.forEach((row) => {
+    const tr = document.createElement('tr');
+    const cells = [row.rowNumber, `${row.firstName} ${row.lastName}`.trim() || '—', row.grade || '—', row.className || '—', row.guardianName || '—'];
+    cells.forEach((value) => { const td = document.createElement('td'); td.textContent = value; tr.append(td); });
+    const status = document.createElement('td');
+    status.className = row.ready ? 'bulk-status-ready' : 'bulk-status-error';
+    status.textContent = row.ready ? 'Ready' : row.errors.join(', ');
+    tr.append(status); body.append(tr);
+  });
+  table.append(body);
+  bulkPreview.replaceChildren(table);
+  bulkPreviewWrap.hidden = false;
+  renderBulkSummary(rows);
+}
+
+function resetBulkDialog() {
+  bulkRows = [];
+  bulkCredentialsData = [];
+  bulkFile.value = '';
+  bulkSetup.hidden = false;
+  bulkResults.hidden = true;
+  bulkPreviewWrap.hidden = true;
+  bulkSummary.hidden = true;
+  bulkPreview.replaceChildren();
+  bulkCredentials.replaceChildren();
+  bulkFailures.hidden = true;
+  bulkPrint.hidden = true;
+  bulkImport.hidden = false;
+  bulkImport.disabled = true;
+  bulkImport.textContent = 'Register ready learners';
+  bulkClose.textContent = 'Cancel';
+  bulkClose.disabled = false;
+  bulkNeedsLogin = false;
+  setStatus(bulkStatus, '');
+}
+
+function openBulkDialog() {
+  resetBulkDialog();
+  bulkDialog.showModal();
+}
+
+function renderCredentials(items) {
+  bulkCredentials.replaceChildren(...items.map((item) => {
+    const card = document.createElement('article');
+    card.className = 'credential-card';
+    card.innerHTML = '<strong></strong><span></span><b></b>';
+    card.querySelector('strong').textContent = `${item.learner.firstName} ${item.learner.lastName}`;
+    card.querySelector('span').textContent = `${item.learner.studentId} · ${gradeLabel(item.learner.grade)}`;
+    card.querySelector('b').textContent = `PIN: ${item.pin}`;
+    return card;
+  }));
+}
+
+async function importBulkRows() {
+  const readyRows = bulkRows.filter((row) => row.ready);
+  if (!readyRows.length) return;
+  const confirmed = await confirmAction({
+    title: 'Register these learners?',
+    message: `This will create ${readyRows.length} learner record${readyRows.length === 1 ? '' : 's'}. Each learner will receive a new student ID and one-time PIN.`,
+    label: 'Register learners',
+  });
+  if (!confirmed) return;
+  bulkImport.disabled = true;
+  bulkClose.disabled = true;
+  bulkImport.textContent = 'Registering…';
+  const created = [];
+  const failures = [];
+  for (const row of readyRows) {
+    try {
+      const data = await api('/api/admin/learners', { method: 'POST', body: { firstName: row.firstName, lastName: row.lastName, grade: row.grade, className: row.className, guardianName: row.guardianName, guardianPhone: row.guardianPhone } });
+      created.push({ rowNumber: row.rowNumber, learner: data.learner, pin: data.pin });
+    } catch (error) {
+      if (error.status === 401) {
+        bulkNeedsLogin = true;
+        failures.push(`Row ${row.rowNumber}: your session ended. Close this sheet after printing any credentials, then sign in again.`);
+        break;
+      }
+      failures.push(`Row ${row.rowNumber}: ${errorMessage(error, 'could not be registered')}`);
+    }
+  }
+  bulkCredentialsData = created;
+  bulkSetup.hidden = true;
+  bulkResults.hidden = false;
+  bulkImport.hidden = true;
+  bulkPrint.hidden = created.length === 0;
+  bulkClose.disabled = false;
+  bulkClose.textContent = 'Close';
+  bulkResultSummary.innerHTML = `<span class="bulk-chip bulk-chip-ready">${created.length} registered</span><span class="bulk-chip ${failures.length ? 'bulk-chip-error' : ''}">${failures.length} failed</span>`;
+  renderCredentials(created);
+  if (failures.length) { bulkFailures.textContent = failures.join(' '); bulkFailures.hidden = false; }
+  await loadLearners();
+  if (created.length) toast(`${created.length} learner${created.length === 1 ? '' : 's'} registered.`);
+}
+
+document.getElementById('import-learners').addEventListener('click', openBulkDialog);
+document.getElementById('download-template').addEventListener('click', () => downloadCsv('em-desh-learner-import-template.csv', [
+  ['First name', 'Last name', 'Grade', 'Class', 'Guardian name', 'Guardian phone'],
+  ['Maria', 'Amutenya', '4', 'A', 'Ndapewa Amutenya', '+264 81 555 0001'],
+]));
+bulkFile.addEventListener('change', async () => {
+  const file = bulkFile.files?.[0];
+  if (!file) return;
+  if (file.size > 2 * 1024 * 1024) { setStatus(bulkStatus, 'Choose a CSV file smaller than 2 MB.'); return; }
+  try {
+    const parsed = validateBulkRows(parseCsv(await file.text()));
+    if (parsed.headerError) { bulkRows = []; bulkPreviewWrap.hidden = true; bulkSummary.hidden = true; bulkImport.disabled = true; setStatus(bulkStatus, parsed.headerError); return; }
+    bulkRows = parsed.rows;
+    setStatus(bulkStatus, 'Preview ready. Check the rows, then confirm registration.', 'success');
+    renderBulkPreview(bulkRows);
+  } catch {
+    setStatus(bulkStatus, 'This CSV file could not be read. Download the template and try again.');
+  }
+});
+bulkImport.addEventListener('click', importBulkRows);
+bulkPrint.addEventListener('click', () => window.print());
+bulkDialog.addEventListener('close', () => {
+  const needsLogin = bulkNeedsLogin;
+  resetBulkDialog();
+  if (needsLogin) showLogin('Your session has ended. Please sign in again.', { focus: true });
 });
 
 async function resetPin(learner) {
