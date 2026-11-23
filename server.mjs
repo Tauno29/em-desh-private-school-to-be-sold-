@@ -2,16 +2,22 @@ import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { extname, join, normalize, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import mysql from 'mysql2/promise';
+import { createClient } from '@supabase/supabase-js';
 import { application } from './functions/routes.mjs';
 
 const root = fileURLToPath(new URL('.', import.meta.url));
 const port = Number(process.env.PORT ?? 3000);
-const databaseUrl = process.env.DATABASE_URL;
+const supabaseUrl = process.env.SUPABASE_URL;
+const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const storageBucket = process.env.SUPABASE_STORAGE_BUCKET || 'school-files';
 
-if (!databaseUrl) {
-  throw new Error('DATABASE_URL is required for the published school website');
+if (!supabaseUrl || !serviceRoleKey) {
+  throw new Error('SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required for the published school website');
 }
+
+const supabase = createClient(supabaseUrl, serviceRoleKey, {
+  auth: { autoRefreshToken: false, persistSession: false },
+});
 
 const TABLES = new Set([
   'sessions', 'login_throttle', 'learners', 'applications', 'gallery_images',
@@ -23,36 +29,7 @@ const ID_TABLES = new Set([
 const IDENTIFIER = /^[a-z][a-z0-9_]*$/;
 const clone = (value) => structuredClone(value);
 
-function parseDatabaseUrl(value) {
-  const url = new URL(value);
-  const options = {
-    uri: value,
-    waitForConnections: true,
-    connectionLimit: 8,
-    maxIdle: 8,
-    idleTimeout: 60000,
-    enableKeepAlive: true,
-    timezone: 'Z',
-  };
-  if (url.searchParams.get('ssl') === 'false') delete options.ssl;
-  else options.ssl = { rejectUnauthorized: false };
-  return options;
-}
-
-const pool = mysql.createPool(parseDatabaseUrl(databaseUrl));
-
-function quoteIdentifier(name) {
-  if (!IDENTIFIER.test(name)) throw new Error(`Unsafe identifier: ${name}`);
-  return `\`${name}\``;
-}
-
-function normalizeValue(value) {
-  if (value === undefined) return null;
-  if (value instanceof Uint8Array || Buffer.isBuffer(value)) return Buffer.from(value);
-  return value;
-}
-
-class MysqlQuery {
+class SupabaseQuery {
   constructor(table, mode, payload = null) {
     this.table = table;
     this.mode = mode;
@@ -62,171 +39,95 @@ class MysqlQuery {
     this.orderBy = null;
     this.limitN = null;
   }
-  insert(payload) { return new MysqlQuery(this.table, 'insert', payload); }
-  update(payload) { return new MysqlQuery(this.table, 'update', payload); }
-  delete() { return new MysqlQuery(this.table, 'delete'); }
+  insert(payload) { return new SupabaseQuery(this.table, 'insert', payload); }
+  update(payload) { return new SupabaseQuery(this.table, 'update', payload); }
+  delete() { return new SupabaseQuery(this.table, 'delete'); }
   select(columns) { this.columns = columns; return this; }
-  eq(column, value) { this.filters.push([column, '=', value]); return this; }
-  neq(column, value) { this.filters.push([column, '<>', value]); return this; }
+  eq(column, value) { this.filters.push(['eq', column, value]); return this; }
+  neq(column, value) { this.filters.push(['neq', column, value]); return this; }
   order(column, { ascending = true } = {}) { this.orderBy = [column, ascending]; return this; }
   limit(count) { this.limitN = count; return this; }
   async then(resolve, reject) {
     try { return await this.execute().then(resolve, reject); } catch (error) { if (reject) return reject(error); throw error; }
   }
+  apply(builder) {
+    let query = builder;
+    for (const [operator, column, value] of this.filters) query = query[operator](column, value);
+    if (this.orderBy) query = query.order(this.orderBy[0], { ascending: this.orderBy[1] });
+    if (this.limitN !== null) query = query.limit(Number(this.limitN));
+    return query;
+  }
   selectedColumns() {
     if (!this.columns) return '*';
     const columns = String(this.columns).split(',').map((part) => part.trim()).filter(Boolean);
     if (!columns.length || columns.some((column) => !IDENTIFIER.test(column))) throw new Error('Unsafe select list');
-    return columns.map(quoteIdentifier).join(', ');
-  }
-  whereSql() {
-    if (!this.filters.length) return { sql: '', values: [] };
-    return {
-      sql: ` WHERE ${this.filters.map(([column, operator]) => `${quoteIdentifier(column)} ${operator} ?`).join(' AND ')}`,
-      values: this.filters.map(([, , value]) => normalizeValue(value)),
-    };
-  }
-  async fetchRows() {
-    const where = this.whereSql();
-    let sql = `SELECT ${this.selectedColumns()} FROM ${quoteIdentifier(this.table)}${where.sql}`;
-    const values = [...where.values];
-    if (this.orderBy) sql += ` ORDER BY ${quoteIdentifier(this.orderBy[0])} ${this.orderBy[1] ? 'ASC' : 'DESC'}`;
-    if (this.limitN !== null) { sql += ' LIMIT ?'; values.push(Number(this.limitN)); }
-    const [rows] = await pool.query(sql, values);
-    return rows;
+    return columns.join(',');
   }
   async execute() {
     if (!TABLES.has(this.table)) throw new Error(`Unknown table: ${this.table}`);
     try {
-      if (this.mode === 'select') return { data: await this.fetchRows(), error: null };
+      if (this.mode === 'select') {
+        const query = this.apply(supabase.from(this.table).select(this.selectedColumns()));
+        const { data, error } = await query;
+        return { data: data || [], error };
+      }
+
       if (this.mode === 'insert') {
         const row = { ...(ID_TABLES.has(this.table) ? { id: crypto.randomUUID() } : {}), ...this.payload };
-        const keys = Object.keys(row).filter((key) => IDENTIFIER.test(key));
-        const sql = `INSERT INTO ${quoteIdentifier(this.table)} (${keys.map(quoteIdentifier).join(', ')}) VALUES (${keys.map(() => '?').join(', ')})`;
-        await pool.query(sql, keys.map((key) => normalizeValue(row[key])));
-        if (!this.columns) return { data: null, error: null };
-        if (row.id) {
-          const lookup = new MysqlQuery(this.table, 'select', null).select(this.columns).eq('id', row.id);
-          return { data: await lookup.fetchRows(), error: null };
-        }
-        const selected = String(this.columns).split(',').map((column) => column.trim()).filter(Boolean);
-        return { data: [Object.fromEntries(selected.map((column) => [column, clone(row[column])]))], error: null };
+        let query = supabase.from(this.table).insert(row);
+        if (this.columns) query = query.select(this.selectedColumns());
+        const { data, error } = await query;
+        return { data: data || null, error };
       }
-      const before = await this.fetchRows();
-      if (this.mode === 'delete') {
-        const where = this.whereSql();
-        await pool.query(`DELETE FROM ${quoteIdentifier(this.table)}${where.sql}`, where.values);
-        return { data: this.columns ? before : null, error: null };
-      }
-      const keys = Object.keys(this.payload ?? {}).filter((key) => IDENTIFIER.test(key));
-      if (!keys.length) return { data: this.columns ? before : null, error: null };
-      const where = this.whereSql();
-      await pool.query(
-        `UPDATE ${quoteIdentifier(this.table)} SET ${keys.map((key) => `${quoteIdentifier(key)} = ?`).join(', ')}${where.sql}`,
-        [...keys.map((key) => normalizeValue(this.payload[key])), ...where.values],
-      );
-      if (!this.columns) return { data: null, error: null };
-      return { data: await this.fetchRows(), error: null };
+
+      let query;
+      if (this.mode === 'delete') query = supabase.from(this.table).delete();
+      else query = supabase.from(this.table).update(this.payload ?? {});
+      query = this.apply(query);
+      if (this.columns) query = query.select(this.selectedColumns());
+      const { data, error } = await query;
+      return { data: data || null, error };
     } catch (error) {
-      const duplicate = error?.code === 'ER_DUP_ENTRY';
+      const duplicate = error?.code === '23505' || error?.code === '409';
       return { data: null, error: duplicate ? { code: '23505', message: 'duplicate key value violates unique constraint' } : error };
     }
   }
 }
 
 function createDatabaseClient() {
-  return { from: (table) => new MysqlQuery(table, 'select') };
+  return { from: (table) => new SupabaseQuery(table, 'select') };
 }
 
-class MysqlStorage {
+class SupabaseStorage {
+  bucket() { return supabase.storage.from(storageBucket); }
   async createSignedUploadUrl(path) {
-    return { signedUrl: `/storage/upload/${encodeURIComponent(path)}` };
+    const { data, error } = await this.bucket().createSignedUploadUrl(path);
+    if (error || !data?.signedUrl) throw error || new Error('storage_upload_url_unavailable');
+    return { signedUrl: data.signedUrl };
   }
-  async createSignedUrl(path) {
-    const [rows] = await pool.query('SELECT object_path FROM storage_objects WHERE object_path = ? LIMIT 1', [path]);
-    if (!rows.length) throw new Error('storage_object_not_found');
-    return { signedUrl: `/storage/view/${encodeURIComponent(path)}` };
+  async createSignedUrl(path, expiresIn = 3600) {
+    const { data, error } = await this.bucket().createSignedUrl(path, expiresIn);
+    if (error || !data?.signedUrl) throw error || new Error('storage_object_not_found');
+    return { signedUrl: data.signedUrl };
   }
   async download(path) {
-    const [rows] = await pool.query('SELECT bytes, content_type FROM storage_objects WHERE object_path = ? LIMIT 1', [path]);
-    if (!rows.length) throw new Error('storage_object_not_found');
-    return new Response(rows[0].bytes, { headers: { 'content-type': rows[0].content_type } });
+    const { data, error } = await this.bucket().download(path);
+    if (error || !data) throw error || new Error('storage_object_not_found');
+    return new Response(await data.arrayBuffer(), { headers: { 'content-type': data.type || 'application/octet-stream' } });
   }
   async remove(paths) {
     if (!paths?.length) return { removed: 0 };
-    const placeholders = paths.map(() => '?').join(',');
-    await pool.query(`DELETE FROM storage_objects WHERE object_path IN (${placeholders})`, paths);
+    const { error } = await this.bucket().remove(paths);
+    if (error) throw error;
     return { removed: paths.length };
   }
   async put(path, bytes, contentType) {
-    await pool.query(
-      `INSERT INTO storage_objects (object_path, bytes, content_type, created_at)
-       VALUES (?, ?, ?, ?)
-       ON DUPLICATE KEY UPDATE bytes = VALUES(bytes), content_type = VALUES(content_type)`,
-      [path, Buffer.from(bytes), contentType || 'application/octet-stream', new Date().toISOString()],
-    );
+    const { error } = await this.bucket().upload(path, Buffer.from(bytes), {
+      contentType: contentType || 'application/octet-stream',
+      upsert: true,
+    });
+    if (error) throw error;
   }
-}
-
-async function initSchema() {
-  const statements = [
-    `CREATE TABLE IF NOT EXISTS learners (
-      id CHAR(36) PRIMARY KEY, student_id VARCHAR(32) NOT NULL UNIQUE,
-      first_name VARCHAR(80) NOT NULL, last_name VARCHAR(80) NOT NULL,
-      grade VARCHAR(8) NOT NULL, class_name VARCHAR(80) NOT NULL DEFAULT '',
-      guardian_name VARCHAR(120) NOT NULL, guardian_phone VARCHAR(40) NOT NULL DEFAULT '',
-      status VARCHAR(16) NOT NULL DEFAULT 'active', pin_hash TEXT NOT NULL,
-      created_at VARCHAR(40) NOT NULL, updated_at VARCHAR(40) NOT NULL,
-      INDEX learners_created_idx (created_at), INDEX learners_status_idx (status)
-    )`,
-    `CREATE TABLE IF NOT EXISTS sessions (
-      token_hash VARCHAR(128) PRIMARY KEY, role VARCHAR(16) NOT NULL,
-      learner_id CHAR(36) NULL, expires_at VARCHAR(40) NOT NULL, created_at VARCHAR(40) NOT NULL,
-      INDEX sessions_learner_idx (learner_id), INDEX sessions_expiry_idx (expires_at)
-    )`,
-    `CREATE TABLE IF NOT EXISTS login_throttle (
-      throttle_key VARCHAR(255) PRIMARY KEY, failed_attempts INT NOT NULL,
-      locked_until VARCHAR(40) NOT NULL, updated_at VARCHAR(40) NOT NULL
-    )`,
-    `CREATE TABLE IF NOT EXISTS applications (
-      id CHAR(36) PRIMARY KEY, first_name VARCHAR(80) NOT NULL, last_name VARCHAR(80) NOT NULL,
-      grade VARCHAR(8) NOT NULL, father_name VARCHAR(120) NOT NULL DEFAULT '',
-      father_phone VARCHAR(40) NOT NULL DEFAULT '', father_occupation VARCHAR(120) NOT NULL DEFAULT '',
-      mother_name VARCHAR(120) NOT NULL DEFAULT '', mother_phone VARCHAR(40) NOT NULL DEFAULT '',
-      mother_occupation VARCHAR(120) NOT NULL DEFAULT '', guardian_name VARCHAR(120) NOT NULL,
-      guardian_email VARCHAR(160) NOT NULL DEFAULT '', guardian_phone VARCHAR(40) NOT NULL DEFAULT '',
-      message TEXT NOT NULL, status VARCHAR(16) NOT NULL DEFAULT 'new',
-      created_at VARCHAR(40) NOT NULL, updated_at VARCHAR(40) NOT NULL,
-      INDEX applications_created_idx (created_at), INDEX applications_status_idx (status)
-    )`,
-    `CREATE TABLE IF NOT EXISTS gallery_images (
-      id CHAR(36) PRIMARY KEY, caption VARCHAR(120) NOT NULL DEFAULT '',
-      object_path VARCHAR(255) NOT NULL UNIQUE, content_type VARCHAR(80) NOT NULL,
-      size_bytes INT NOT NULL, status VARCHAR(16) NOT NULL DEFAULT 'pending', created_at VARCHAR(40) NOT NULL,
-      INDEX gallery_created_idx (created_at), INDEX gallery_status_idx (status)
-    )`,
-    `CREATE TABLE IF NOT EXISTS behavior_records (
-      id CHAR(36) PRIMARY KEY, learner_id CHAR(36) NOT NULL, note VARCHAR(500) NOT NULL,
-      recorded_on VARCHAR(40) NOT NULL, created_at VARCHAR(40) NOT NULL,
-      INDEX behavior_learner_idx (learner_id), INDEX behavior_recorded_idx (recorded_on)
-    )`,
-    `CREATE TABLE IF NOT EXISTS test_results (
-      id CHAR(36) PRIMARY KEY, learner_id CHAR(36) NOT NULL, subject VARCHAR(60) NOT NULL,
-      score INT NOT NULL, term VARCHAR(40) NOT NULL DEFAULT '', recorded_on VARCHAR(40) NOT NULL,
-      created_at VARCHAR(40) NOT NULL, INDEX tests_learner_idx (learner_id), INDEX tests_recorded_idx (recorded_on)
-    )`,
-    `CREATE TABLE IF NOT EXISTS report_cards (
-      id CHAR(36) PRIMARY KEY, learner_id CHAR(36) NOT NULL, object_path VARCHAR(255) NOT NULL UNIQUE,
-      file_name VARCHAR(255) NOT NULL, content_type VARCHAR(80) NOT NULL, size_bytes INT NOT NULL,
-      term VARCHAR(40) NOT NULL DEFAULT '', status VARCHAR(16) NOT NULL DEFAULT 'pending', created_at VARCHAR(40) NOT NULL,
-      INDEX reports_learner_idx (learner_id), INDEX reports_created_idx (created_at)
-    )`,
-    `CREATE TABLE IF NOT EXISTS storage_objects (
-      object_path VARCHAR(255) PRIMARY KEY, bytes LONGBLOB NOT NULL,
-      content_type VARCHAR(80) NOT NULL, created_at VARCHAR(40) NOT NULL
-    )`,
-  ];
-  for (const statement of statements) await pool.query(statement);
 }
 
 class BackendError extends Error {
@@ -234,7 +135,7 @@ class BackendError extends Error {
 }
 
 const db = createDatabaseClient();
-const storage = new MysqlStorage();
+const storage = new SupabaseStorage();
 const handle = application({
   db,
   storage,
@@ -315,7 +216,6 @@ async function serveStatic(res, pathname) {
   }
 }
 
-await initSchema();
 const server = createServer(async (req, res) => {
   const pathname = new URL(req.url, `http://${req.headers.host}`).pathname;
   try {
@@ -343,5 +243,4 @@ server.listen(port, '0.0.0.0', () => {
 
 process.on('SIGTERM', async () => {
   server.close();
-  await pool.end();
 });
