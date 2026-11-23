@@ -115,7 +115,10 @@
               <h2>Registered learners</h2>
               <p class="panel-note">Each registration receives a unique student ID and a six-digit PIN for the learner portal.</p>
             </div>
-            <button class="btn btn-primary" type="button" id="add-learner">Register learner</button>
+            <div class="panel-head-actions">
+              <button class="btn btn-ghost" type="button" id="import-learners">Import CSV</button>
+              <button class="btn btn-primary" type="button" id="add-learner">Register learner</button>
+            </div>
           </header>
 
           <div class="toolbar">
@@ -281,6 +284,47 @@
     </form>
   </dialog>
 
+  <dialog class="sheet sheet-wide" id="bulk-dialog" aria-labelledby="bulk-title">
+    <div class="sheet-head">
+      <div>
+        <p class="card-kicker" id="bulk-kicker">Bulk registration</p>
+        <h2 id="bulk-title">Import learners from CSV</h2>
+        <p class="records-sub">Review every row before saving. No records are created until you confirm the import.</p>
+      </div>
+      <button class="icon-btn" type="button" data-close="bulk-dialog" aria-label="Close">&times;</button>
+    </div>
+    <div class="sheet-body" id="bulk-setup">
+      <div class="bulk-instructions">
+        <p><strong>One learner per row.</strong> First name, last name and grade are required. Class, guardian name and guardian phone are optional.</p>
+        <p class="field-hint">Grades can be KG, Kindergarten, Pre-Primary, or 1–7. Use the template to avoid column-name mistakes.</p>
+      </div>
+      <div class="bulk-actions">
+        <button class="btn btn-ghost" type="button" id="download-template">Download CSV template</button>
+        <label class="btn btn-primary file-button" for="bulk-file">Choose completed CSV<input type="file" id="bulk-file" accept=".csv,text/csv" hidden></label>
+      </div>
+      <p class="form-status" id="bulk-status" role="status" aria-live="polite"></p>
+      <div class="bulk-summary" id="bulk-summary" hidden></div>
+      <div class="bulk-preview-wrap" id="bulk-preview-wrap" hidden>
+        <div class="bulk-preview-head">
+          <h3>Import preview</h3>
+          <p class="field-hint">Rows marked “Ready” will be registered. Fix other rows in the spreadsheet and select it again.</p>
+        </div>
+        <div class="bulk-preview" id="bulk-preview"></div>
+      </div>
+    </div>
+    <div class="sheet-body bulk-results" id="bulk-results" hidden>
+      <div class="bulk-summary" id="bulk-result-summary"></div>
+      <p class="notice">These PINs are shown only once. Print or save this sheet securely before closing.</p>
+      <div class="credentials-list" id="bulk-credentials"></div>
+      <p class="panel-error" id="bulk-failures" hidden></p>
+    </div>
+    <div class="sheet-foot">
+      <button class="btn btn-ghost" type="button" data-close="bulk-dialog" id="bulk-close">Cancel</button>
+      <button class="btn btn-ghost" type="button" id="bulk-print" hidden>Print credentials</button>
+      <button class="btn btn-primary" type="button" id="bulk-import" disabled>Register ready learners</button>
+    </div>
+  </dialog>
+
   <dialog class="sheet" id="pin-dialog" aria-labelledby="pin-title">
     <div class="sheet-head">
       <div>
@@ -422,7 +466,7 @@
 
   <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
-  <script src="app.js?v=20261120i" defer></script>
-  <script type="module" src="admin.js?v=20261120i"></script>
+  <script src="app.js?v=20261123a" defer></script>
+  <script type="module" src="admin.js?v=20261123a"></script>
 </body>
 </html>
