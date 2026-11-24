@@ -1,4 +1,4 @@
-import { api, errorMessage, formatDate } from './api.js?v=20261120g';
+import { api, errorMessage, formatDate } from './api.js?v=20261125a';
 
 const grid = document.getElementById('gallery-grid');
 const count = document.getElementById('gallery-count');

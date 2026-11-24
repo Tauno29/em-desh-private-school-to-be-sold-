@@ -11,13 +11,75 @@
   setScrolled();
   window.addEventListener('scroll', setScrolled, { passive: true });
 
-  // Visitors who prefer reduced motion get a paused video with visible controls.
-  document.querySelectorAll('.hero-media[autoplay]').forEach((video) => {
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      video.removeAttribute('autoplay');
-      video.pause();
+  const homepageNotice = document.getElementById('homepage-notice');
+  const homepageNoticeText = document.getElementById('homepage-notice-text');
+  const homepageNoticeLink = document.getElementById('homepage-notice-link');
+  const homepageWelcomeVideo = document.getElementById('homepage-welcome-video');
+  const homepageNews = document.getElementById('homepage-news');
+  const homepageNewsCarousel = document.getElementById('homepage-news-carousel');
+  const homepageNewsControls = document.getElementById('homepage-news-controls');
+  const homepageNewsPosition = document.getElementById('homepage-news-position');
+  const homepageNewsPrev = document.getElementById('homepage-news-prev');
+  const homepageNewsNext = document.getElementById('homepage-news-next');
+
+  let newsItems = [];
+  let newsIndex = 0;
+
+  function renderNews() {
+    const item = newsItems[newsIndex];
+    if (!item) return;
+    const figure = document.createElement('figure');
+    figure.className = 'news-card';
+    const image = document.createElement('img');
+    image.src = item.url;
+    image.alt = item.caption || 'Recent school event at Em-Desh';
+    image.loading = 'lazy';
+    const caption = document.createElement('figcaption');
+    caption.textContent = item.caption || 'Recent school event';
+    figure.append(image, caption);
+    homepageNewsCarousel.replaceChildren(figure);
+    homepageNewsPosition.textContent = `${newsIndex + 1} / ${newsItems.length}`;
+  }
+
+  function showNews(index) {
+    newsIndex = (index + newsItems.length) % newsItems.length;
+    renderNews();
+  }
+
+  homepageNewsPrev?.addEventListener('click', () => showNews(newsIndex - 1));
+  homepageNewsNext?.addEventListener('click', () => showNews(newsIndex + 1));
+
+  async function loadHomepage() {
+    try {
+      const response = await fetch('/.netlify/functions/app/api/homepage', { headers: { accept: 'application/json' } });
+      if (!response.ok) return;
+      const data = await response.json();
+      const settings = data.settings ?? {};
+      if (settings.notificationEnabled && settings.notificationText) {
+        homepageNoticeText.textContent = settings.notificationText;
+        if (settings.notificationLinkText && settings.notificationLinkUrl) {
+          homepageNoticeLink.textContent = settings.notificationLinkText;
+          homepageNoticeLink.href = settings.notificationLinkUrl;
+          homepageNoticeLink.hidden = false;
+        }
+        homepageNotice.hidden = false;
+      }
+      if (data.welcomeVideo?.url) {
+        homepageWelcomeVideo.src = data.welcomeVideo.url;
+        homepageWelcomeVideo.load();
+      }
+      newsItems = Array.isArray(data.news) ? data.news : [];
+      if (newsItems.length) {
+        homepageNews.hidden = false;
+        homepageNewsControls.hidden = false;
+        renderNews();
+      }
+    } catch {
+      // The static hero and rest of the landing page remain usable offline.
     }
-  });
+  }
+
+  loadHomepage();
 
   const closeNav = () => {
     if (!toggle || !nav) return;

@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=20261120i">
+  <link rel="stylesheet" href="styles.css?v=20261124k">
   <script type="application/ld+json">
     {
       "@context": "https://schema.org",
@@ -67,6 +67,16 @@
 
   <main id="main">
 
+    <section class="notice-banner" id="homepage-notice" hidden aria-label="School notification">
+      <div class="container notice-banner-inner">
+        <div>
+          <p class="notice-kicker">School notice</p>
+          <p class="notice-text" id="homepage-notice-text"></p>
+        </div>
+        <a class="btn btn-ghost notice-link" id="homepage-notice-link" href="#" hidden></a>
+      </div>
+    </section>
+
     <section class="hero" aria-labelledby="hero-title">
       <div class="container hero-grid">
         <div class="hero-copy">
@@ -81,7 +91,7 @@
         </div>
 
         <figure class="hero-figure">
-          <video class="hero-media" src="assets/hero-video.mp4" poster="assets/hero-classroom.png" width="1536" height="1024" autoplay muted loop playsinline controls preload="metadata" aria-label="Video from Em-Desh English Medium Private School"></video>
+          <video class="hero-media" id="homepage-welcome-video" src="assets/hero-video.mp4" poster="assets/hero-classroom.png" width="1536" height="1024" autoplay muted loop playsinline controls preload="metadata" aria-label="Video from Em-Desh English Medium Private School"></video>
           <figcaption class="hero-badge">
             <span class="hero-badge-kicker">Since 2019</span>
             <span class="hero-badge-text">Knowledge is power &middot; Education is life</span>
@@ -107,6 +117,22 @@
         <div class="fact">
           <span class="fact-value">Hostel</span>
           <span class="fact-label">On-site boarding</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="homepage-news section-alt" id="homepage-news" hidden aria-labelledby="homepage-news-title">
+      <div class="container">
+        <header class="section-head reveal">
+          <p class="eyebrow">School life</p>
+          <h2 id="homepage-news-title">Recent events at Em-Desh.</h2>
+          <p class="section-lede">See the latest moments and activities shared by the school office.</p>
+        </header>
+        <div class="news-carousel" id="homepage-news-carousel" aria-live="polite"></div>
+        <div class="news-controls" id="homepage-news-controls" hidden>
+          <button class="btn btn-ghost btn-sm" type="button" id="homepage-news-prev" aria-label="Previous recent event">Previous</button>
+          <span class="news-position" id="homepage-news-position"></span>
+          <button class="btn btn-ghost btn-sm" type="button" id="homepage-news-next" aria-label="Next recent event">Next</button>
         </div>
       </div>
     </section>
@@ -349,6 +375,6 @@
     </div>
   </footer>
 
-  <script src="app.js?v=20261120i" defer></script>
+  <script src="app.js?v=20261125a" defer></script>
 </body>
 </html>

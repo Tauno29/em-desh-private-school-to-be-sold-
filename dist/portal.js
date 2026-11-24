@@ -1,6 +1,6 @@
 import {
   api, clearAuthToken, errorMessage, gradeLabel, formatDate, initials, setAuthToken,
-} from './api.js?v=20261120g';
+} from './api.js?v=20261125a';
 
 const TOKEN_KEY = 'omps_portal_token';
 

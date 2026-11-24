@@ -1,4 +1,4 @@
-const BASE = '/functions/v1/app';
+const BASE = '/.netlify/functions/app';
 
 // Cookie sessions cover normal browsing; this header session also works when
 // the embedding preview treats the site as third-party and drops cookies.

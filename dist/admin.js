@@ -1,7 +1,7 @@
 import {
   ApiError, api, clearAuthToken, DOCUMENT_TYPES, errorMessage, formatDate, gradeLabel,
-  IMAGE_TYPES, MAX_DOCUMENT_BYTES, MAX_IMAGE_BYTES, setAuthToken,
-} from './api.js?v=20261120g';
+  IMAGE_TYPES, MAX_DOCUMENT_BYTES, MAX_IMAGE_BYTES, MAX_VIDEO_BYTES, VIDEO_TYPES, setAuthToken,
+} from './api.js?v=20261125a';
 
 const TOKEN_KEY = 'omps_admin_token';
 
@@ -104,6 +104,20 @@ const adminGallery = document.getElementById('admin-gallery');
 const adminGalleryEmpty = document.getElementById('admin-gallery-empty');
 const adminGalleryCount = document.getElementById('admin-gallery-count');
 const galleryError = document.getElementById('gallery-error');
+const homepageSettingsForm = document.getElementById('homepage-settings-form');
+const homepageNotificationEnabled = document.getElementById('homepage-notification-enabled');
+const homepageNotificationText = document.getElementById('homepage-notification-text');
+const homepageNotificationLinkText = document.getElementById('homepage-notification-link-text');
+const homepageNotificationLinkUrl = document.getElementById('homepage-notification-link-url');
+const homepageSettingsSubmit = document.getElementById('homepage-settings-submit');
+const homepageSettingsStatus = document.getElementById('homepage-settings-status');
+const welcomeVideoForm = document.getElementById('welcome-video-form');
+const welcomeVideoFile = document.getElementById('welcome-video-file');
+const welcomeVideoLabel = document.getElementById('welcome-video-label');
+const welcomeVideoPreview = document.getElementById('welcome-video-preview');
+const welcomeVideoSubmit = document.getElementById('welcome-video-submit');
+const welcomeVideoStatus = document.getElementById('welcome-video-status');
+const photoPlacement = document.getElementById('photo-placement');
 const toastNode = document.getElementById('toast');
 
 const recordsDialog = document.getElementById('records-dialog');
@@ -356,8 +370,111 @@ signoutButton.addEventListener('click', async () => {
 });
 
 async function refreshAll() {
-  await Promise.allSettled([loadLearners(), loadApplications(), loadGallery()]);
+  await Promise.allSettled([loadLearners(), loadApplications(), loadGallery(), loadHomepageSettings()]);
 }
+
+async function loadHomepageSettings() {
+  try {
+    const data = await api('/api/admin/site-settings');
+    const settings = data.settings ?? {};
+    homepageNotificationEnabled.checked = settings.notificationEnabled === true;
+    homepageNotificationText.value = settings.notificationText ?? '';
+    homepageNotificationLinkText.value = settings.notificationLinkText ?? '';
+    homepageNotificationLinkUrl.value = settings.notificationLinkUrl ?? '';
+  } catch (error) {
+    if (error.status === 401) sessionExpired();
+    else setStatus(homepageSettingsStatus, errorMessage(error, 'Homepage settings could not be loaded.'));
+  }
+}
+
+homepageSettingsForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  homepageSettingsSubmit.disabled = true;
+  setStatus(homepageSettingsStatus, 'Saving homepage notice…', 'success');
+  try {
+    await api('/api/admin/site-settings', {
+      method: 'PATCH',
+      body: {
+        notificationEnabled: homepageNotificationEnabled.checked,
+        notificationText: homepageNotificationText.value.trim(),
+        notificationLinkText: homepageNotificationLinkText.value.trim(),
+        notificationLinkUrl: homepageNotificationLinkUrl.value.trim(),
+      },
+    });
+    setStatus(homepageSettingsStatus, 'Homepage notice saved.', 'success');
+    toast('Homepage notice saved.');
+  } catch (error) {
+    if (error.status === 401) sessionExpired();
+    else setStatus(homepageSettingsStatus, errorMessage(error, 'Homepage settings could not be saved.'));
+  } finally {
+    homepageSettingsSubmit.disabled = false;
+  }
+});
+
+let welcomeVideoPreviewUrl = null;
+
+function clearWelcomeVideoSelection() {
+  welcomeVideoFile.value = '';
+  welcomeVideoLabel.textContent = 'Choose a welcome video from this device';
+  welcomeVideoPreview.hidden = true;
+  welcomeVideoPreview.removeAttribute('src');
+  if (welcomeVideoPreviewUrl) URL.revokeObjectURL(welcomeVideoPreviewUrl);
+  welcomeVideoPreviewUrl = null;
+}
+
+welcomeVideoFile.addEventListener('change', () => {
+  setStatus(welcomeVideoStatus, '');
+  const file = welcomeVideoFile.files?.[0];
+  if (!file) { clearWelcomeVideoSelection(); return; }
+  if (!VIDEO_TYPES.includes(file.type) || file.size > MAX_VIDEO_BYTES) {
+    clearWelcomeVideoSelection();
+    setStatus(welcomeVideoStatus, 'Choose an MP4 or WebM video up to 25 MB.');
+    return;
+  }
+  if (welcomeVideoPreviewUrl) URL.revokeObjectURL(welcomeVideoPreviewUrl);
+  welcomeVideoPreviewUrl = URL.createObjectURL(file);
+  welcomeVideoPreview.src = welcomeVideoPreviewUrl;
+  welcomeVideoPreview.hidden = false;
+  welcomeVideoLabel.textContent = `${file.name} · ${(file.size / (1024 * 1024)).toFixed(1)} MB`;
+});
+
+welcomeVideoForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const file = welcomeVideoFile.files?.[0];
+  if (!file || !VIDEO_TYPES.includes(file.type) || file.size > MAX_VIDEO_BYTES) {
+    setStatus(welcomeVideoStatus, 'Choose an MP4 or WebM video up to 25 MB.');
+    return;
+  }
+  welcomeVideoSubmit.disabled = true;
+  setStatus(welcomeVideoStatus, 'Preparing video upload…', 'success');
+  try {
+    const intent = await api('/api/admin/welcome-video', {
+      method: 'POST', body: { contentType: file.type, sizeBytes: file.size },
+    });
+    setStatus(welcomeVideoStatus, 'Uploading welcome video…', 'success');
+    let upload;
+    const controller = new AbortController();
+    const uploadTimer = setTimeout(() => controller.abort(), 180000);
+    try {
+      upload = await fetch(intent.uploadUrl, {
+        method: 'PUT', credentials: 'same-origin',
+        headers: { 'Content-Type': file.type }, body: file, signal: controller.signal,
+      });
+    } catch { throw new ApiError('network_unavailable', 0); }
+    finally { clearTimeout(uploadTimer); }
+    if (!upload.ok) throw new ApiError('upload_failed', upload.status);
+    setStatus(welcomeVideoStatus, 'Checking the uploaded video…', 'success');
+    await api('/api/admin/welcome-video/complete', { method: 'POST' });
+    clearWelcomeVideoSelection();
+    setStatus(welcomeVideoStatus, 'Welcome video replaced.', 'success');
+    toast('Welcome video replaced.');
+  } catch (error) {
+    if (error.status === 401) sessionExpired();
+    else setStatus(welcomeVideoStatus, errorMessage(error, 'The welcome video could not be uploaded.'));
+  } finally {
+    welcomeVideoSubmit.disabled = false;
+  }
+});
 
 // ---- learners --------------------------------------------------------------
 
@@ -1529,6 +1646,19 @@ function adminPhoto(item) {
   meta.textContent = [formatDate(item.createdAt), item.status === 'pending' ? 'Pending' : ''].filter(Boolean).join(' · ');
   info.append(caption, meta);
 
+  const placement = document.createElement('select');
+  placement.className = 'input admin-photo-placement';
+  placement.setAttribute('aria-label', `Homepage placement for ${item.caption || 'photo'}`);
+  for (const [value, label] of [['gallery', 'Gallery only'], ['news', 'Recent event'], ['hero', 'Homepage hero']]) {
+    const option = document.createElement('option');
+    option.value = value;
+    option.textContent = label;
+    placement.append(option);
+  }
+  placement.value = item.homepageRole || 'gallery';
+  placement.disabled = item.status !== 'ready';
+  placement.addEventListener('change', () => updatePhotoPlacement(item, placement));
+
   const remove = document.createElement('button');
   remove.type = 'button';
   remove.className = 'btn btn-ghost btn-sm btn-danger-ghost';
@@ -1536,9 +1666,24 @@ function adminPhoto(item) {
   remove.setAttribute('aria-label', `Delete photo: ${item.caption || 'Untitled photo'}`);
   remove.addEventListener('click', () => deletePhoto(item));
 
-  body.append(info, remove);
+  body.append(info, placement, remove);
   card.append(body);
   return card;
+}
+
+async function updatePhotoPlacement(item, select) {
+  select.disabled = true;
+  try {
+    await api(`/api/admin/gallery/${item.id}`, { method: 'PATCH', body: { homepageRole: select.value } });
+    item.homepageRole = select.value;
+    toast(select.value === 'hero' ? 'Homepage hero replaced.' : select.value === 'news' ? 'Added to homepage recent events.' : 'Removed from homepage placement.');
+  } catch (error) {
+    if (error.status === 401) return sessionExpired();
+    select.value = item.homepageRole || 'gallery';
+    toast(errorMessage(error, 'Photo placement could not be updated.'), 'error');
+  } finally {
+    select.disabled = false;
+  }
 }
 
 function renderGallery() {
@@ -1630,7 +1775,7 @@ photoForm.addEventListener('submit', async (event) => {
   try {
     const intent = await api('/api/admin/gallery', {
       method: 'POST',
-      body: { caption: photoCaption.value.trim(), contentType: file.type, sizeBytes: file.size },
+      body: { caption: photoCaption.value.trim(), contentType: file.type, sizeBytes: file.size, homepageRole: photoPlacement.value },
     });
     setStatus(photoStatus, 'Uploading photo…', 'success');
     let upload;
@@ -1654,6 +1799,7 @@ photoForm.addEventListener('submit', async (event) => {
     await api(`/api/admin/gallery/${intent.id}/complete`, { method: 'POST' });
     clearFileSelection();
     photoCaption.value = '';
+    photoPlacement.value = 'gallery';
     setStatus(photoStatus, 'Photo published to the gallery.', 'success');
     toast('Photo published.');
     await loadGallery();
@@ -1678,6 +1824,10 @@ const tabs = [
   {
     button: document.getElementById('tab-btn-applications'),
     panel: document.getElementById('tab-applications'),
+  },
+  {
+    button: document.getElementById('tab-btn-homepage'),
+    panel: document.getElementById('tab-homepage'),
   },
   {
     button: document.getElementById('tab-btn-gallery'),

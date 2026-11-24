@@ -1,4 +1,4 @@
-import { api, errorMessage, gradeLabel } from './api.js?v=20261120g';
+import { api, errorMessage, gradeLabel } from './api.js?v=20261125a';
 
 const form = document.getElementById('apply-form');
 const panel = document.getElementById('apply-panel');

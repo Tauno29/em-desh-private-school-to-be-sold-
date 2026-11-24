@@ -1,4 +1,4 @@
-const BASE = '/functions/v1/app';
+const BASE = '/.netlify/functions/app';
 
 // Cookie sessions cover normal browsing; this header session also works when
 // the embedding preview treats the site as third-party and drops cookies.
@@ -67,15 +67,18 @@ const MESSAGES = {
   email_invalid: 'Enter a valid email address.',
   consent_required: 'Please tick the box to allow the school office to contact you.',
   unsupported_media_type: 'Use a JPG, PNG or WebP image.',
+  invalid_video: 'Choose an MP4 or WebM video up to 25 MB.',
   unsupported_document_type: 'Use a PDF or a JPG, PNG or WebP image.',
   document_too_large: 'Report cards can be up to 10 MB.',
   payload_too_large: 'That request was too large.',
   invalid_upload: 'The uploaded image could not be verified. Try a smaller JPG, PNG or WebP file.',
+  video_upload_failed: 'The welcome video could not be verified. Please try again.',
   upload_pending: 'The upload did not reach storage. Please try again.',
   upload_unavailable: 'The image could not be verified. Please try again.',
   upload_failed: 'The image upload failed. Please try again.',
   storage_unavailable: 'Photo storage is temporarily unavailable. Please try again.',
   database_unavailable: 'The school records are temporarily unavailable. Please try again.',
+  delete_confirmation_required: 'Type “delete all learners” exactly to confirm this permanent action.',
   student_id_unavailable: 'Could not allocate a student ID. Please try again.',
   pin_unchanged: 'Choose a PIN that is different from your current one.',
   not_found: 'That item no longer exists. Refresh the page.',
@@ -105,6 +108,8 @@ export function initials(firstName, lastName) {
 }
 
 export const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+export const VIDEO_TYPES = ['video/mp4', 'video/webm'];
 export const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+export const MAX_VIDEO_BYTES = 25 * 1024 * 1024;
 export const DOCUMENT_TYPES = ['application/pdf', ...IMAGE_TYPES];
 export const MAX_DOCUMENT_BYTES = 10 * 1024 * 1024;

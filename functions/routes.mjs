@@ -85,9 +85,11 @@ export function application({ db, storage, BackendError, env }) {
   // differs from the internal request URL, and the gateway does not forward the
   // public host. The owner-fixed suffix survives site renames, so accept any
   // https host under it plus externally forwarded hosts, never arbitrary origins.
-  const SITE_HOST_SUFFIX = '-wx7u4fclyzp.qoder.website';
+  const SITE_HOST_SUFFIX = env.get('SITE_HOST_SUFFIX') || '-wx7u4fclyzp.qoder.website';
+  const PUBLIC_SITE_ORIGIN = env.get('PUBLIC_SITE_ORIGIN')?.replace(/\/$/, '').toLowerCase();
 
   function isPublishedSiteOrigin(origin) {
+    if (PUBLIC_SITE_ORIGIN && origin === PUBLIC_SITE_ORIGIN) return true;
     try {
       const url = new URL(origin);
       return url.protocol === 'https:'
@@ -603,7 +605,7 @@ export function application({ db, storage, BackendError, env }) {
 
   async function route(request) {
     const url = new URL(request.url);
-    const match = url.pathname.match(/^\/(?:functions\/v1\/)?(?:app|app-d[0-9a-f]{32})(\/.*)?$/);
+    const match = url.pathname.match(/^\/(?:\.netlify\/functions\/|functions\/v1\/)?(?:app|app-d[0-9a-f]{32})(\/.*)?$/);
     if (!match) fail('not_found', 404);
     const path = match[1] || '/';
     const method = request.method;
