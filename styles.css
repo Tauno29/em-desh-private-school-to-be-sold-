@@ -434,6 +434,10 @@ strong {
   pointer-events: none;
 }
 
+.hero-figure:has(.hero-news-slot)::before {
+  border-radius: var(--site-radius);
+}
+
 .hero-figure img,
 .hero-figure video {
   position: relative;
@@ -461,8 +465,10 @@ strong {
 }
 
 .hero-news-slot .news-card img {
-  aspect-ratio: 3 / 2;
-  border-radius: 220px 220px var(--site-radius) var(--site-radius);
+  height: auto;
+  aspect-ratio: auto;
+  object-fit: contain;
+  border-radius: var(--site-radius) var(--site-radius) 0 0;
   box-shadow: 0 34px 70px -46px rgba(30, 42, 34, 0.65);
 }
 
