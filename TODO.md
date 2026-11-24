@@ -3,7 +3,6 @@
 ## Landing-page content management
 
 - [ ] The landing page no longer loads or displays the welcome video.
-- [ ] The landing page no longer displays the pasted/static hero placeholder; recent-event images use that media area when uploaded.
 - [ ] The landing page displays a notification banner that can be enabled, disabled, and edited by an authenticated staff member.
 - [ ] The staff dashboard lets the admin upload and replace the landing-page hero image without exposing storage credentials.
 - [ ] The staff dashboard lets the admin mark uploaded photos as homepage recent-event images, remove that placement, and delete photos.

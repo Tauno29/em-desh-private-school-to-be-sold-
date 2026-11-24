@@ -67,16 +67,15 @@
       if (data.hero?.url) {
         homepageHero.src = data.hero.url;
         homepageHero.alt = data.hero.caption || 'Em-Desh English Medium Private School';
-        homepageHero.hidden = false;
       }
       newsItems = Array.isArray(data.news) ? data.news : [];
-      if (newsItems.length && !data.hero?.url) {
+      if (newsItems.length) {
         homepageNews.hidden = false;
         homepageNewsControls.hidden = false;
         renderNews();
       }
     } catch {
-      // The rest of the landing page remains usable when homepage content is unavailable.
+      // The static hero and rest of the landing page remain usable offline.
     }
   }
 
