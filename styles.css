@@ -439,8 +439,9 @@ strong {
   position: relative;
   display: block;
   width: 100%;
-  aspect-ratio: 3 / 2;
-  object-fit: cover;
+  height: auto;
+  aspect-ratio: auto;
+  object-fit: contain;
   border-radius: 220px 220px var(--site-radius) var(--site-radius);
   box-shadow: 0 34px 70px -46px rgba(30, 42, 34, 0.65);
 }
@@ -636,8 +637,9 @@ strong {
 .about-figure img {
   display: block;
   width: 100%;
-  aspect-ratio: 4 / 3;
-  object-fit: cover;
+  height: auto;
+  aspect-ratio: auto;
+  object-fit: contain;
   border: 1px solid var(--site-border);
   border-radius: var(--site-radius);
   box-shadow: var(--shadow-soft);
@@ -891,8 +893,9 @@ strong {
 .admissions-figure img {
   display: block;
   width: 100%;
-  aspect-ratio: 4 / 3;
-  object-fit: cover;
+  height: auto;
+  aspect-ratio: auto;
+  object-fit: contain;
   border: 1px solid var(--site-border);
   border-radius: var(--site-radius);
 }
@@ -1787,8 +1790,9 @@ select.input {
 .gallery-card img {
   display: block;
   width: 100%;
-  aspect-ratio: 4 / 3;
-  object-fit: cover;
+  height: auto;
+  aspect-ratio: auto;
+  object-fit: contain;
   transition: transform calc(420ms * var(--site-motion, 1)) var(--ease), opacity var(--dur) var(--ease);
 }
 
@@ -2513,8 +2517,9 @@ select.input {
 .upload-preview {
   display: block;
   width: 100%;
-  aspect-ratio: 16 / 9;
-  object-fit: cover;
+  height: auto;
+  aspect-ratio: auto;
+  object-fit: contain;
   margin-bottom: 18px;
   border: 1px solid var(--site-border);
   border-radius: var(--site-radius);
@@ -2552,8 +2557,9 @@ select.input {
 .admin-photo img {
   display: block;
   width: 100%;
-  aspect-ratio: 4 / 3;
-  object-fit: cover;
+  height: auto;
+  aspect-ratio: auto;
+  object-fit: contain;
 }
 
 .admin-photo .pending {
