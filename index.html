@@ -91,11 +91,15 @@
         </div>
 
         <figure class="hero-figure">
-          <img class="hero-media" id="homepage-hero-image" src="assets/hero-classroom.png" alt="Learners learning at Em-Desh English Medium Private School" width="1536" height="1024">
-          <figcaption class="hero-badge">
-            <span class="hero-badge-kicker">Since 2019</span>
-            <span class="hero-badge-text">Knowledge is power &middot; Education is life</span>
-          </figcaption>
+          <img class="hero-media" id="homepage-hero-image" alt="Learners learning at Em-Desh English Medium Private School" width="1536" height="1024" hidden>
+          <div class="hero-news-slot" id="homepage-news" hidden aria-label="Recent school events">
+            <div class="news-carousel" id="homepage-news-carousel" aria-live="polite"></div>
+            <div class="news-controls" id="homepage-news-controls" hidden>
+              <button class="btn btn-ghost btn-sm" type="button" id="homepage-news-prev" aria-label="Previous recent event">Previous</button>
+              <span class="news-position" id="homepage-news-position"></span>
+              <button class="btn btn-ghost btn-sm" type="button" id="homepage-news-next" aria-label="Next recent event">Next</button>
+            </div>
+          </div>
         </figure>
       </div>
     </section>
@@ -117,22 +121,6 @@
         <div class="fact">
           <span class="fact-value">Hostel</span>
           <span class="fact-label">On-site boarding</span>
-        </div>
-      </div>
-    </section>
-
-    <section class="homepage-news section-alt" id="homepage-news" hidden aria-labelledby="homepage-news-title">
-      <div class="container">
-        <header class="section-head reveal">
-          <p class="eyebrow">School life</p>
-          <h2 id="homepage-news-title">Recent events at Em-Desh.</h2>
-          <p class="section-lede">See the latest moments and activities shared by the school office.</p>
-        </header>
-        <div class="news-carousel" id="homepage-news-carousel" aria-live="polite"></div>
-        <div class="news-controls" id="homepage-news-controls" hidden>
-          <button class="btn btn-ghost btn-sm" type="button" id="homepage-news-prev" aria-label="Previous recent event">Previous</button>
-          <span class="news-position" id="homepage-news-position"></span>
-          <button class="btn btn-ghost btn-sm" type="button" id="homepage-news-next" aria-label="Next recent event">Next</button>
         </div>
       </div>
     </section>
