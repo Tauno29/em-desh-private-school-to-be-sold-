@@ -215,6 +215,18 @@
             <p class="form-status" id="homepage-settings-status" role="status" aria-live="polite"></p>
           </form>
 
+          <form class="content-editor homepage-video-editor" id="welcome-video-form" novalidate>
+            <h3>Welcome video</h3>
+            <p class="panel-note">Upload an MP4 or WebM video up to 25 MB. A new upload replaces the current welcome video on the landing page.</p>
+            <label class="file-drop" for="welcome-video-file" id="welcome-video-drop">
+              <input type="file" id="welcome-video-file" accept="video/mp4,video/webm" required>
+              <span class="file-drop-text" id="welcome-video-label">Choose a welcome video from this device</span>
+            </label>
+            <video class="upload-preview" id="welcome-video-preview" controls muted playsinline hidden></video>
+            <button class="btn btn-primary" type="submit" id="welcome-video-submit">Replace welcome video</button>
+            <p class="form-status" id="welcome-video-status" role="status" aria-live="polite"></p>
+          </form>
+
           <div class="homepage-help">
             <h3>Homepage photo placements</h3>
             <p>Use the Gallery tab to upload an image. Choose <strong>Hero image</strong> to replace the landing-page image, or <strong>Recent event</strong> to add it to the switchable news containers. Existing gallery photos remain on the public gallery page.</p>
@@ -558,7 +570,7 @@
 
   <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
-  <script src="app.js?v=20261123b" defer></script>
-  <script type="module" src="admin.js?v=20261123c"></script>
+  <script src="app.js?v=20261124j" defer></script>
+  <script type="module" src="admin.js?v=20261124k"></script>
 </body>
 </html>

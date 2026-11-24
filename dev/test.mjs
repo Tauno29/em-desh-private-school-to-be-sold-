@@ -243,6 +243,24 @@ result = await call('PATCH', '/api/admin/site-settings', { cookie: adminCookie, 
 check('admin updates homepage notification', result.status === 200 && result.body.settings.notificationEnabled === true && result.body.settings.notificationText === 'Admissions are open.');
 result = await call('GET', '/api/homepage');
 check('public homepage exposes notification', result.status === 200 && result.body.settings.notificationEnabled === true && result.body.settings.notificationLinkUrl === 'https://school.example/apply');
+result = await call('GET', '/api/admin/welcome-video');
+check('welcome video status requires admin', result.status === 401);
+result = await call('POST', '/api/admin/welcome-video', { cookie: adminCookie, body: { contentType: 'image/png', sizeBytes: 10 } });
+check('invalid welcome video type rejected', result.status === 415);
+const videoBytes = new Uint8Array([0, 0, 0, 24, 102, 116, 121, 112, 109, 112, 52, 50]);
+result = await call('POST', '/api/admin/welcome-video', { cookie: adminCookie, body: { contentType: 'video/mp4', sizeBytes: videoBytes.length } });
+check('welcome video upload intent returns signed URL', result.status === 201 && typeof result.body.uploadUrl === 'string');
+result = await call('POST', '/api/admin/welcome-video/complete', { cookie: adminCookie });
+check('welcome video complete before upload returns 409', result.status === 409 && result.body.error === 'upload_pending');
+storage.uploadLast(videoBytes, 'video/mp4');
+result = await call('POST', '/api/admin/welcome-video/complete', { cookie: adminCookie });
+check('welcome video upload verifies and completes', result.status === 200 && result.body.video?.url.includes('/local-view/'));
+result = await call('GET', '/api/homepage');
+check('public homepage exposes welcome video', result.status === 200 && result.body.welcomeVideo?.contentType === 'video/mp4' && result.body.welcomeVideo.url.includes('/local-view/'));
+result = await call('POST', '/api/admin/welcome-video', { cookie: adminCookie, body: { contentType: 'video/mp4', sizeBytes: videoBytes.length } });
+storage.uploadLast(videoBytes, 'video/mp4');
+result = await call('POST', '/api/admin/welcome-video/complete', { cookie: adminCookie });
+check('welcome video can be replaced', result.status === 200 && result.body.video?.url.includes('/local-view/'));
 
 result = await call('POST', '/api/admin/gallery', { cookie: adminCookie, body: { caption: 'Latest event', contentType: 'image/png', sizeBytes: pngBytes.length, homepageRole: 'news', homepageOrder: 1 } });
 const newsImageId = result.body?.id;

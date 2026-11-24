@@ -67,10 +67,12 @@ const MESSAGES = {
   email_invalid: 'Enter a valid email address.',
   consent_required: 'Please tick the box to allow the school office to contact you.',
   unsupported_media_type: 'Use a JPG, PNG or WebP image.',
+  invalid_video: 'Choose an MP4 or WebM video up to 25 MB.',
   unsupported_document_type: 'Use a PDF or a JPG, PNG or WebP image.',
   document_too_large: 'Report cards can be up to 10 MB.',
   payload_too_large: 'That request was too large.',
   invalid_upload: 'The uploaded image could not be verified. Try a smaller JPG, PNG or WebP file.',
+  video_upload_failed: 'The welcome video could not be verified. Please try again.',
   upload_pending: 'The upload did not reach storage. Please try again.',
   upload_unavailable: 'The image could not be verified. Please try again.',
   upload_failed: 'The image upload failed. Please try again.',
@@ -106,6 +108,8 @@ export function initials(firstName, lastName) {
 }
 
 export const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+export const VIDEO_TYPES = ['video/mp4', 'video/webm'];
 export const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+export const MAX_VIDEO_BYTES = 25 * 1024 * 1024;
 export const DOCUMENT_TYPES = ['application/pdf', ...IMAGE_TYPES];
 export const MAX_DOCUMENT_BYTES = 10 * 1024 * 1024;

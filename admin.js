@@ -1,7 +1,7 @@
 import {
   ApiError, api, clearAuthToken, DOCUMENT_TYPES, errorMessage, formatDate, gradeLabel,
-  IMAGE_TYPES, MAX_DOCUMENT_BYTES, MAX_IMAGE_BYTES, setAuthToken,
-} from './api.js?v=20261120g';
+  IMAGE_TYPES, MAX_DOCUMENT_BYTES, MAX_IMAGE_BYTES, MAX_VIDEO_BYTES, VIDEO_TYPES, setAuthToken,
+} from './api.js?v=20261124h';
 
 const TOKEN_KEY = 'omps_admin_token';
 
@@ -111,6 +111,12 @@ const homepageNotificationLinkText = document.getElementById('homepage-notificat
 const homepageNotificationLinkUrl = document.getElementById('homepage-notification-link-url');
 const homepageSettingsSubmit = document.getElementById('homepage-settings-submit');
 const homepageSettingsStatus = document.getElementById('homepage-settings-status');
+const welcomeVideoForm = document.getElementById('welcome-video-form');
+const welcomeVideoFile = document.getElementById('welcome-video-file');
+const welcomeVideoLabel = document.getElementById('welcome-video-label');
+const welcomeVideoPreview = document.getElementById('welcome-video-preview');
+const welcomeVideoSubmit = document.getElementById('welcome-video-submit');
+const welcomeVideoStatus = document.getElementById('welcome-video-status');
 const photoPlacement = document.getElementById('photo-placement');
 const toastNode = document.getElementById('toast');
 
@@ -402,6 +408,71 @@ homepageSettingsForm.addEventListener('submit', async (event) => {
     else setStatus(homepageSettingsStatus, errorMessage(error, 'Homepage settings could not be saved.'));
   } finally {
     homepageSettingsSubmit.disabled = false;
+  }
+});
+
+let welcomeVideoPreviewUrl = null;
+
+function clearWelcomeVideoSelection() {
+  welcomeVideoFile.value = '';
+  welcomeVideoLabel.textContent = 'Choose a welcome video from this device';
+  welcomeVideoPreview.hidden = true;
+  welcomeVideoPreview.removeAttribute('src');
+  if (welcomeVideoPreviewUrl) URL.revokeObjectURL(welcomeVideoPreviewUrl);
+  welcomeVideoPreviewUrl = null;
+}
+
+welcomeVideoFile.addEventListener('change', () => {
+  setStatus(welcomeVideoStatus, '');
+  const file = welcomeVideoFile.files?.[0];
+  if (!file) { clearWelcomeVideoSelection(); return; }
+  if (!VIDEO_TYPES.includes(file.type) || file.size > MAX_VIDEO_BYTES) {
+    clearWelcomeVideoSelection();
+    setStatus(welcomeVideoStatus, 'Choose an MP4 or WebM video up to 25 MB.');
+    return;
+  }
+  if (welcomeVideoPreviewUrl) URL.revokeObjectURL(welcomeVideoPreviewUrl);
+  welcomeVideoPreviewUrl = URL.createObjectURL(file);
+  welcomeVideoPreview.src = welcomeVideoPreviewUrl;
+  welcomeVideoPreview.hidden = false;
+  welcomeVideoLabel.textContent = `${file.name} · ${(file.size / (1024 * 1024)).toFixed(1)} MB`;
+});
+
+welcomeVideoForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const file = welcomeVideoFile.files?.[0];
+  if (!file || !VIDEO_TYPES.includes(file.type) || file.size > MAX_VIDEO_BYTES) {
+    setStatus(welcomeVideoStatus, 'Choose an MP4 or WebM video up to 25 MB.');
+    return;
+  }
+  welcomeVideoSubmit.disabled = true;
+  setStatus(welcomeVideoStatus, 'Preparing video upload…', 'success');
+  try {
+    const intent = await api('/api/admin/welcome-video', {
+      method: 'POST', body: { contentType: file.type, sizeBytes: file.size },
+    });
+    setStatus(welcomeVideoStatus, 'Uploading welcome video…', 'success');
+    let upload;
+    const controller = new AbortController();
+    const uploadTimer = setTimeout(() => controller.abort(), 180000);
+    try {
+      upload = await fetch(intent.uploadUrl, {
+        method: 'PUT', credentials: 'same-origin',
+        headers: { 'Content-Type': file.type }, body: file, signal: controller.signal,
+      });
+    } catch { throw new ApiError('network_unavailable', 0); }
+    finally { clearTimeout(uploadTimer); }
+    if (!upload.ok) throw new ApiError('upload_failed', upload.status);
+    setStatus(welcomeVideoStatus, 'Checking the uploaded video…', 'success');
+    await api('/api/admin/welcome-video/complete', { method: 'POST' });
+    clearWelcomeVideoSelection();
+    setStatus(welcomeVideoStatus, 'Welcome video replaced.', 'success');
+    toast('Welcome video replaced.');
+  } catch (error) {
+    if (error.status === 401) sessionExpired();
+    else setStatus(welcomeVideoStatus, errorMessage(error, 'The welcome video could not be uploaded.'));
+  } finally {
+    welcomeVideoSubmit.disabled = false;
   }
 });
 

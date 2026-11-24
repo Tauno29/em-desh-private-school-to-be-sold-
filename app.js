@@ -14,7 +14,7 @@
   const homepageNotice = document.getElementById('homepage-notice');
   const homepageNoticeText = document.getElementById('homepage-notice-text');
   const homepageNoticeLink = document.getElementById('homepage-notice-link');
-  const homepageHero = document.getElementById('homepage-hero-image');
+  const homepageWelcomeVideo = document.getElementById('homepage-welcome-video');
   const homepageNews = document.getElementById('homepage-news');
   const homepageNewsCarousel = document.getElementById('homepage-news-carousel');
   const homepageNewsControls = document.getElementById('homepage-news-controls');
@@ -64,9 +64,9 @@
         }
         homepageNotice.hidden = false;
       }
-      if (data.hero?.url) {
-        homepageHero.src = data.hero.url;
-        homepageHero.alt = data.hero.caption || 'Em-Desh English Medium Private School';
+      if (data.welcomeVideo?.url) {
+        homepageWelcomeVideo.src = data.welcomeVideo.url;
+        homepageWelcomeVideo.load();
       }
       newsItems = Array.isArray(data.news) ? data.news : [];
       if (newsItems.length) {

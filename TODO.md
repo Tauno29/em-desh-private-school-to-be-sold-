@@ -2,7 +2,8 @@
 
 ## Landing-page content management
 
-- [ ] The landing page no longer loads or displays the welcome video.
+- [ ] The landing page displays the welcome video with the existing local video as its fallback.
+- [ ] The staff dashboard lets the admin upload and replace the welcome video using a verified MP4 or WebM upload up to 25 MB.
 - [ ] The landing page displays a notification banner that can be enabled, disabled, and edited by an authenticated staff member.
 - [ ] The staff dashboard lets the admin upload and replace the landing-page hero image without exposing storage credentials.
 - [ ] The staff dashboard lets the admin mark uploaded photos as homepage recent-event images, remove that placement, and delete photos.

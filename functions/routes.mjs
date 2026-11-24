@@ -17,7 +17,9 @@ const LEARNER_THROTTLE_WINDOW_MS = 15 * 60 * 1000;
 const LEARNER_THROTTLE_MAX_ATTEMPTS = 10;
 const MAX_BODY_BYTES = 16384;
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+const MAX_VIDEO_BYTES = 25 * 1024 * 1024;
 const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+const VIDEO_TYPES = ['video/mp4', 'video/webm'];
 const REPORT_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
 const MAX_REPORT_BYTES = 10 * 1024 * 1024;
 const APPLICATION_STATUSES = ['new', 'contacted', 'archived'];
@@ -539,6 +541,20 @@ export function application({ db, storage, BackendError, env }) {
     notificationLinkUrl: '',
   };
 
+  async function readSetting(settingKey) {
+    const found = rows(await db.from('site_settings').select('setting_value').eq('setting_key', settingKey).limit(1));
+    return found[0]?.setting_value || '';
+  }
+
+  async function writeSetting(settingKey, settingValue) {
+    const existing = rows(await db.from('site_settings').select('setting_key').eq('setting_key', settingKey).limit(1));
+    const payload = { setting_value: settingValue, updated_at: new Date().toISOString() };
+    const result = existing.length
+      ? await db.from('site_settings').update(payload).eq('setting_key', settingKey).select('setting_key')
+      : await db.from('site_settings').insert({ setting_key: settingKey, ...payload }).select('setting_key');
+    if (result.error) fail('database_unavailable', 503);
+  }
+
   async function readSiteSettings() {
     const found = rows(await db.from('site_settings').select('setting_key,setting_value').limit(50));
     const values = { ...DEFAULT_SETTINGS };
@@ -549,6 +565,19 @@ export function application({ db, storage, BackendError, env }) {
       if (row.setting_key === 'notificationLinkUrl') values.notificationLinkUrl = row.setting_value || '';
     }
     return values;
+  }
+
+  async function signedWelcomeVideo() {
+    const objectPath = await readSetting('welcomeVideoPath');
+    if (!objectPath) return null;
+    try {
+      const signed = await storage.createSignedUrl(objectPath, 3600);
+      return signed?.signedUrl
+        ? { url: signed.signedUrl, contentType: await readSetting('welcomeVideoContentType') || 'video/mp4' }
+        : null;
+    } catch {
+      return null;
+    }
   }
 
   async function signedHomepageImages() {
@@ -593,6 +622,7 @@ export function application({ db, storage, BackendError, env }) {
       return json({
         ok: true,
         settings: await readSiteSettings(),
+        welcomeVideo: await signedWelcomeVideo(),
         hero: items.find((item) => item.role === 'hero') ?? null,
         news: items.filter((item) => item.role === 'news').slice(0, 8),
       });
@@ -1059,6 +1089,60 @@ export function application({ db, storage, BackendError, env }) {
       return json({ ok: true, settings: await readSiteSettings() });
     }
 
+    if (path === '/api/admin/welcome-video' && is('GET')) {
+      await requireAdmin(request);
+      const objectPath = await readSetting('welcomeVideoPath');
+      const video = await signedWelcomeVideo();
+      return json({ ok: true, configured: Boolean(objectPath && video), video });
+    }
+
+    if (path === '/api/admin/welcome-video' && is('POST')) {
+      await requireAdmin(request);
+      const body = await readJson(request, 2048);
+      const contentType = typeof body.contentType === 'string' ? body.contentType.toLowerCase() : '';
+      const sizeBytes = body.sizeBytes;
+      if (!VIDEO_TYPES.includes(contentType)) fail('unsupported_media_type', 415);
+      if (!Number.isSafeInteger(sizeBytes) || sizeBytes < 1 || sizeBytes > MAX_VIDEO_BYTES) fail('invalid_input', 400);
+      const objectPath = `homepage/welcome-video-${crypto.randomUUID()}`;
+      const signed = await storage.createSignedUploadUrl(objectPath, { upsert: false }).catch(() => null);
+      if (!signed?.signedUrl) fail('storage_unavailable', 503);
+      await writeSetting('welcomeVideoPendingPath', objectPath);
+      await writeSetting('welcomeVideoPendingContentType', contentType);
+      await writeSetting('welcomeVideoPendingSizeBytes', String(sizeBytes));
+      return json({ ok: true, uploadUrl: signed.signedUrl }, 201);
+    }
+
+    if (path === '/api/admin/welcome-video/complete' && is('POST')) {
+      await requireAdmin(request);
+      const objectPath = await readSetting('welcomeVideoPendingPath');
+      const contentType = await readSetting('welcomeVideoPendingContentType');
+      const expectedBytes = Number(await readSetting('welcomeVideoPendingSizeBytes'));
+      if (!objectPath || !VIDEO_TYPES.includes(contentType) || !Number.isSafeInteger(expectedBytes)) fail('upload_pending', 409);
+      let download;
+      try { download = await storage.download(objectPath); } catch { fail('upload_pending', 409); }
+      let verified;
+      try {
+        verified = await verifyUploadedObject(download, {
+          maxBytes: MAX_VIDEO_BYTES,
+          expectedBytes,
+          allowedContentTypes: VIDEO_TYPES,
+          timeoutMs: 30000,
+        });
+      } catch (error) {
+        await storage.remove([objectPath]).catch(() => {});
+        const reason = error?.message === 'upload_too_large' || error?.message === 'upload_size_mismatch' || error?.message === 'upload_type_mismatch' ? 'invalid_upload' : 'upload_unavailable';
+        fail(reason, 422);
+      }
+      const previousPath = await readSetting('welcomeVideoPath');
+      await writeSetting('welcomeVideoPath', objectPath);
+      await writeSetting('welcomeVideoContentType', verified.contentType);
+      await writeSetting('welcomeVideoPendingPath', '');
+      await writeSetting('welcomeVideoPendingContentType', '');
+      await writeSetting('welcomeVideoPendingSizeBytes', '');
+      if (previousPath && previousPath !== objectPath) await storage.remove([previousPath]).catch(() => {});
+      return json({ ok: true, video: await signedWelcomeVideo() });
+    }
+
     if (path === '/api/admin/gallery' && is('GET')) {
       await requireAdmin(request);
       return json({ ok: true, items: await adminGallery() });
@@ -1254,7 +1338,7 @@ export function application({ db, storage, BackendError, env }) {
 
     const known = [
       '/api/gallery', '/api/apply', '/api/admin/login', '/api/admin/logout', '/api/admin/me',
-      '/api/admin/learners', '/api/admin/applications', '/api/admin/gallery',
+      '/api/admin/learners', '/api/admin/applications', '/api/admin/gallery', '/api/admin/welcome-video',
       '/api/portal/login', '/api/portal/logout', '/api/portal/me', '/api/portal/records',
       '/api/portal/change-pin',
     ];

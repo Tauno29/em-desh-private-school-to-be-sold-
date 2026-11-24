@@ -2419,6 +2419,14 @@ select.input {
   background: var(--site-surface);
 }
 
+.homepage-video-editor {
+  margin-top: 22px;
+}
+
+.homepage-video-editor h3 {
+  margin-bottom: 8px;
+}
+
 .content-toggle {
   margin-bottom: 22px;
 }
