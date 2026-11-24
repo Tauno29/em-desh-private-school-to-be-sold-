@@ -104,6 +104,14 @@ const adminGallery = document.getElementById('admin-gallery');
 const adminGalleryEmpty = document.getElementById('admin-gallery-empty');
 const adminGalleryCount = document.getElementById('admin-gallery-count');
 const galleryError = document.getElementById('gallery-error');
+const homepageSettingsForm = document.getElementById('homepage-settings-form');
+const homepageNotificationEnabled = document.getElementById('homepage-notification-enabled');
+const homepageNotificationText = document.getElementById('homepage-notification-text');
+const homepageNotificationLinkText = document.getElementById('homepage-notification-link-text');
+const homepageNotificationLinkUrl = document.getElementById('homepage-notification-link-url');
+const homepageSettingsSubmit = document.getElementById('homepage-settings-submit');
+const homepageSettingsStatus = document.getElementById('homepage-settings-status');
+const photoPlacement = document.getElementById('photo-placement');
 const toastNode = document.getElementById('toast');
 
 const recordsDialog = document.getElementById('records-dialog');
@@ -356,8 +364,46 @@ signoutButton.addEventListener('click', async () => {
 });
 
 async function refreshAll() {
-  await Promise.allSettled([loadLearners(), loadApplications(), loadGallery()]);
+  await Promise.allSettled([loadLearners(), loadApplications(), loadGallery(), loadHomepageSettings()]);
 }
+
+async function loadHomepageSettings() {
+  try {
+    const data = await api('/api/admin/site-settings');
+    const settings = data.settings ?? {};
+    homepageNotificationEnabled.checked = settings.notificationEnabled === true;
+    homepageNotificationText.value = settings.notificationText ?? '';
+    homepageNotificationLinkText.value = settings.notificationLinkText ?? '';
+    homepageNotificationLinkUrl.value = settings.notificationLinkUrl ?? '';
+  } catch (error) {
+    if (error.status === 401) sessionExpired();
+    else setStatus(homepageSettingsStatus, errorMessage(error, 'Homepage settings could not be loaded.'));
+  }
+}
+
+homepageSettingsForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  homepageSettingsSubmit.disabled = true;
+  setStatus(homepageSettingsStatus, 'Saving homepage notice…', 'success');
+  try {
+    await api('/api/admin/site-settings', {
+      method: 'PATCH',
+      body: {
+        notificationEnabled: homepageNotificationEnabled.checked,
+        notificationText: homepageNotificationText.value.trim(),
+        notificationLinkText: homepageNotificationLinkText.value.trim(),
+        notificationLinkUrl: homepageNotificationLinkUrl.value.trim(),
+      },
+    });
+    setStatus(homepageSettingsStatus, 'Homepage notice saved.', 'success');
+    toast('Homepage notice saved.');
+  } catch (error) {
+    if (error.status === 401) sessionExpired();
+    else setStatus(homepageSettingsStatus, errorMessage(error, 'Homepage settings could not be saved.'));
+  } finally {
+    homepageSettingsSubmit.disabled = false;
+  }
+});
 
 // ---- learners --------------------------------------------------------------
 
@@ -1529,6 +1575,19 @@ function adminPhoto(item) {
   meta.textContent = [formatDate(item.createdAt), item.status === 'pending' ? 'Pending' : ''].filter(Boolean).join(' · ');
   info.append(caption, meta);
 
+  const placement = document.createElement('select');
+  placement.className = 'input admin-photo-placement';
+  placement.setAttribute('aria-label', `Homepage placement for ${item.caption || 'photo'}`);
+  for (const [value, label] of [['gallery', 'Gallery only'], ['news', 'Recent event'], ['hero', 'Homepage hero']]) {
+    const option = document.createElement('option');
+    option.value = value;
+    option.textContent = label;
+    placement.append(option);
+  }
+  placement.value = item.homepageRole || 'gallery';
+  placement.disabled = item.status !== 'ready';
+  placement.addEventListener('change', () => updatePhotoPlacement(item, placement));
+
   const remove = document.createElement('button');
   remove.type = 'button';
   remove.className = 'btn btn-ghost btn-sm btn-danger-ghost';
@@ -1536,9 +1595,24 @@ function adminPhoto(item) {
   remove.setAttribute('aria-label', `Delete photo: ${item.caption || 'Untitled photo'}`);
   remove.addEventListener('click', () => deletePhoto(item));
 
-  body.append(info, remove);
+  body.append(info, placement, remove);
   card.append(body);
   return card;
+}
+
+async function updatePhotoPlacement(item, select) {
+  select.disabled = true;
+  try {
+    await api(`/api/admin/gallery/${item.id}`, { method: 'PATCH', body: { homepageRole: select.value } });
+    item.homepageRole = select.value;
+    toast(select.value === 'hero' ? 'Homepage hero replaced.' : select.value === 'news' ? 'Added to homepage recent events.' : 'Removed from homepage placement.');
+  } catch (error) {
+    if (error.status === 401) return sessionExpired();
+    select.value = item.homepageRole || 'gallery';
+    toast(errorMessage(error, 'Photo placement could not be updated.'), 'error');
+  } finally {
+    select.disabled = false;
+  }
 }
 
 function renderGallery() {
@@ -1630,7 +1704,7 @@ photoForm.addEventListener('submit', async (event) => {
   try {
     const intent = await api('/api/admin/gallery', {
       method: 'POST',
-      body: { caption: photoCaption.value.trim(), contentType: file.type, sizeBytes: file.size },
+      body: { caption: photoCaption.value.trim(), contentType: file.type, sizeBytes: file.size, homepageRole: photoPlacement.value },
     });
     setStatus(photoStatus, 'Uploading photo…', 'success');
     let upload;
@@ -1654,6 +1728,7 @@ photoForm.addEventListener('submit', async (event) => {
     await api(`/api/admin/gallery/${intent.id}/complete`, { method: 'POST' });
     clearFileSelection();
     photoCaption.value = '';
+    photoPlacement.value = 'gallery';
     setStatus(photoStatus, 'Photo published to the gallery.', 'success');
     toast('Photo published.');
     await loadGallery();
@@ -1678,6 +1753,10 @@ const tabs = [
   {
     button: document.getElementById('tab-btn-applications'),
     panel: document.getElementById('tab-applications'),
+  },
+  {
+    button: document.getElementById('tab-btn-homepage'),
+    panel: document.getElementById('tab-homepage'),
   },
   {
     button: document.getElementById('tab-btn-gallery'),

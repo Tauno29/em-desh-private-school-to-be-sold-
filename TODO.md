@@ -1,5 +1,15 @@
 # TODO
 
+## Landing-page content management
+
+- [ ] The landing page no longer loads or displays the welcome video.
+- [ ] The landing page displays a notification banner that can be enabled, disabled, and edited by an authenticated staff member.
+- [ ] The staff dashboard lets the admin upload and replace the landing-page hero image without exposing storage credentials.
+- [ ] The staff dashboard lets the admin mark uploaded photos as homepage recent-event images, remove that placement, and delete photos.
+- [ ] The landing page displays recent-event images in switchable, keyboard-accessible image containers with captions and safe empty/loading states.
+- [ ] Existing public gallery, learner, application, session, and storage workflows remain compatible.
+- [ ] The MySQL database remains the production database; no CSV learner data is imported automatically.
+
 ## Bulk learner registration
 
 - [x] The staff dashboard retains the existing individual “Register learner” flow and adds an “Import CSV” action.

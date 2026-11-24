@@ -126,6 +126,7 @@
         <div class="tabs" role="tablist" aria-label="Dashboard sections">
           <button class="tab" type="button" role="tab" id="tab-btn-learners" aria-selected="true" aria-controls="tab-learners">Learners</button>
           <button class="tab" type="button" role="tab" id="tab-btn-applications" aria-selected="false" aria-controls="tab-applications" tabindex="-1">Applications</button>
+          <button class="tab" type="button" role="tab" id="tab-btn-homepage" aria-selected="false" aria-controls="tab-homepage" tabindex="-1">Homepage</button>
           <button class="tab" type="button" role="tab" id="tab-btn-gallery" aria-selected="false" aria-controls="tab-gallery" tabindex="-1">Gallery</button>
         </div>
 
@@ -183,6 +184,43 @@
           </div>
         </section>
 
+        <section class="panel" id="tab-homepage" role="tabpanel" aria-labelledby="tab-btn-homepage" hidden>
+          <header class="panel-head">
+            <div>
+              <h2>Homepage updates</h2>
+              <p class="panel-note">Edit the public notice and choose which uploaded photos appear in the landing-page hero and recent events.</p>
+            </div>
+          </header>
+
+          <form class="content-editor" id="homepage-settings-form" novalidate>
+            <label class="check-field content-toggle">
+              <input type="checkbox" id="homepage-notification-enabled">
+              <span><strong>Show notification banner</strong><small>Visitors will see this notice near the top of the landing page.</small></span>
+            </label>
+            <div class="field">
+              <label for="homepage-notification-text">Notification text</label>
+              <textarea class="input" id="homepage-notification-text" rows="3" maxlength="240" placeholder="Registration for the 2027 school year is now open."></textarea>
+            </div>
+            <div class="grid-2">
+              <div class="field">
+                <label for="homepage-notification-link-text">Button text <span class="optional">(optional)</span></label>
+                <input class="input" id="homepage-notification-link-text" maxlength="80" placeholder="Apply now">
+              </div>
+              <div class="field">
+                <label for="homepage-notification-link-url">Button link <span class="optional">(optional)</span></label>
+                <input class="input" id="homepage-notification-link-url" type="url" maxlength="300" placeholder="apply.html or https://…">
+              </div>
+            </div>
+            <button class="btn btn-primary" type="submit" id="homepage-settings-submit">Save homepage notice</button>
+            <p class="form-status" id="homepage-settings-status" role="status" aria-live="polite"></p>
+          </form>
+
+          <div class="homepage-help">
+            <h3>Homepage photo placements</h3>
+            <p>Use the Gallery tab to upload an image. Choose <strong>Hero image</strong> to replace the landing-page image, or <strong>Recent event</strong> to add it to the switchable news containers. Existing gallery photos remain on the public gallery page.</p>
+          </div>
+        </section>
+
         <section class="panel" id="tab-gallery" role="tabpanel" aria-labelledby="tab-btn-gallery" hidden>
           <header class="panel-head">
             <div>
@@ -213,6 +251,15 @@
               <div class="field">
                 <label for="photo-caption">Caption <span class="optional">(optional)</span></label>
                 <input class="input" id="photo-caption" type="text" maxlength="120" placeholder="Sports day at the mission">
+              </div>
+
+              <div class="field">
+                <label for="photo-placement">Homepage placement</label>
+                <select class="input" id="photo-placement">
+                  <option value="gallery">Public gallery only</option>
+                  <option value="news">Recent event on homepage</option>
+                  <option value="hero">Homepage hero image</option>
+                </select>
               </div>
 
               <button class="btn btn-primary btn-block" type="submit" id="photo-submit">Publish photo</button>

@@ -15,7 +15,7 @@ if (!databaseUrl) {
 
 const TABLES = new Set([
   'sessions', 'login_throttle', 'learners', 'applications', 'gallery_images',
-  'behavior_records', 'test_results', 'report_cards',
+  'behavior_records', 'test_results', 'report_cards', 'site_settings',
 ]);
 const ID_TABLES = new Set([
   'learners', 'applications', 'gallery_images', 'behavior_records', 'test_results', 'report_cards',
@@ -202,8 +202,14 @@ async function initSchema() {
     `CREATE TABLE IF NOT EXISTS gallery_images (
       id CHAR(36) PRIMARY KEY, caption VARCHAR(120) NOT NULL DEFAULT '',
       object_path VARCHAR(255) NOT NULL UNIQUE, content_type VARCHAR(80) NOT NULL,
-      size_bytes INT NOT NULL, status VARCHAR(16) NOT NULL DEFAULT 'pending', created_at VARCHAR(40) NOT NULL,
+      size_bytes INT NOT NULL, status VARCHAR(16) NOT NULL DEFAULT 'pending',
+      homepage_role VARCHAR(16) NOT NULL DEFAULT 'gallery', homepage_order INT NOT NULL DEFAULT 0,
+      created_at VARCHAR(40) NOT NULL,
       INDEX gallery_created_idx (created_at), INDEX gallery_status_idx (status)
+    )`,
+    `CREATE TABLE IF NOT EXISTS site_settings (
+      setting_key VARCHAR(80) PRIMARY KEY, setting_value TEXT NOT NULL,
+      updated_at VARCHAR(40) NOT NULL
     )`,
     `CREATE TABLE IF NOT EXISTS behavior_records (
       id CHAR(36) PRIMARY KEY, learner_id CHAR(36) NOT NULL, note VARCHAR(500) NOT NULL,
@@ -227,6 +233,14 @@ async function initSchema() {
     )`,
   ];
   for (const statement of statements) await pool.query(statement);
+  for (const statement of [
+    'ALTER TABLE gallery_images ADD COLUMN homepage_role VARCHAR(16) NOT NULL DEFAULT \'gallery\'',
+    'ALTER TABLE gallery_images ADD COLUMN homepage_order INT NOT NULL DEFAULT 0',
+  ]) {
+    try { await pool.query(statement); } catch (error) {
+      if (!['ER_DUP_FIELDNAME', 'ER_CANT_DROP_FIELD'].includes(error?.code)) throw error;
+    }
+  }
 }
 
 class BackendError extends Error {

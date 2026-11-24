@@ -232,6 +232,49 @@ check('public gallery shows published image', result.status === 200 && result.bo
 result = await call('GET', '/api/admin/gallery', { cookie: adminCookie });
 check('admin gallery lists ready image', result.status === 200 && result.body.items[0].status === 'ready');
 
+console.log('--- homepage content management ---');
+result = await call('GET', '/api/homepage');
+check('homepage returns default settings', result.status === 200 && result.body.settings.notificationEnabled === false && result.body.settings.notificationText === '' && result.body.hero === null && result.body.news.length === 0);
+result = await call('GET', '/api/admin/site-settings');
+check('homepage settings require admin', result.status === 401);
+result = await call('PATCH', '/api/admin/site-settings', { cookie: adminCookie, body: { notificationEnabled: true, notificationText: 'Admissions are open.', notificationLinkText: 'Apply now', notificationLinkUrl: 'javascript:alert(1)' } });
+check('invalid notification URL rejected', result.status === 400 && result.body.error === 'invalid_input');
+result = await call('PATCH', '/api/admin/site-settings', { cookie: adminCookie, body: { notificationEnabled: true, notificationText: 'Admissions are open.', notificationLinkText: 'Apply now', notificationLinkUrl: 'https://school.example/apply' } });
+check('admin updates homepage notification', result.status === 200 && result.body.settings.notificationEnabled === true && result.body.settings.notificationText === 'Admissions are open.');
+result = await call('GET', '/api/homepage');
+check('public homepage exposes notification', result.status === 200 && result.body.settings.notificationEnabled === true && result.body.settings.notificationLinkUrl === 'https://school.example/apply');
+
+result = await call('POST', '/api/admin/gallery', { cookie: adminCookie, body: { caption: 'Latest event', contentType: 'image/png', sizeBytes: pngBytes.length, homepageRole: 'news', homepageOrder: 1 } });
+const newsImageId = result.body?.id;
+check('news placement accepted on upload', result.status === 201);
+storage.uploadLast(pngBytes, 'image/png');
+result = await call('POST', `/api/admin/gallery/${newsImageId}/complete`, { cookie: adminCookie });
+check('news image completes', result.status === 200);
+result = await call('POST', '/api/admin/gallery', { cookie: adminCookie, body: { caption: 'Classroom hero', contentType: 'image/png', sizeBytes: pngBytes.length, homepageRole: 'hero' } });
+const heroImageId = result.body?.id;
+check('hero placement accepted on upload', result.status === 201);
+storage.uploadLast(pngBytes, 'image/png');
+result = await call('POST', `/api/admin/gallery/${heroImageId}/complete`, { cookie: adminCookie });
+check('hero image completes', result.status === 200);
+result = await call('GET', '/api/homepage');
+check('homepage returns selected hero and news images', result.status === 200 && result.body.hero?.id === heroImageId && result.body.news.some((item) => item.id === newsImageId));
+result = await call('POST', '/api/admin/gallery', { cookie: adminCookie, body: { caption: 'Replacement hero', contentType: 'image/png', sizeBytes: pngBytes.length, homepageRole: 'hero' } });
+const replacementHeroId = result.body?.id;
+storage.uploadLast(pngBytes, 'image/png');
+await call('POST', `/api/admin/gallery/${replacementHeroId}/complete`, { cookie: adminCookie });
+result = await call('GET', '/api/homepage');
+check('new hero replaces previous hero', result.status === 200 && result.body.hero?.id === replacementHeroId && !result.body.news.some((item) => item.id === heroImageId));
+result = await call('GET', '/api/admin/gallery', { cookie: adminCookie });
+const previousHero = result.body.items.find((item) => item.id === heroImageId);
+check('previous hero returns to gallery placement', previousHero?.homepageRole === 'gallery');
+result = await call('PATCH', `/api/admin/gallery/${newsImageId}`, { cookie: adminCookie, body: { homepageRole: 'gallery', homepageOrder: 0 } });
+check('admin changes homepage placement', result.status === 200);
+result = await call('PATCH', `/api/admin/gallery/${newsImageId}`, { cookie: adminCookie, body: { homepageRole: 'invalid' } });
+check('invalid homepage placement rejected', result.status === 400 && result.body.error === 'invalid_input');
+await call('DELETE', `/api/admin/gallery/${newsImageId}`, { cookie: adminCookie });
+await call('DELETE', `/api/admin/gallery/${heroImageId}`, { cookie: adminCookie });
+await call('DELETE', `/api/admin/gallery/${replacementHeroId}`, { cookie: adminCookie });
+
 console.log('--- admissions applications ---');
 result = await call('POST', '/api/apply', {
   body: {

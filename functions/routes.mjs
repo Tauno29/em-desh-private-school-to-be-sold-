@@ -506,7 +506,7 @@ export function application({ db, storage, BackendError, env }) {
 
   async function adminGallery() {
     const found = rows(await db.from('gallery_images')
-      .select('id,caption,object_path,content_type,size_bytes,status,created_at')
+      .select('id,caption,object_path,content_type,size_bytes,status,homepage_role,homepage_order,created_at')
       .order('created_at', { ascending: false }).limit(100));
     return Promise.all(found.map(async (row) => {
       let url = null;
@@ -524,10 +524,50 @@ export function application({ db, storage, BackendError, env }) {
         status: row.status,
         sizeBytes: row.size_bytes,
         contentType: row.content_type,
+        homepageRole: row.homepage_role || 'gallery',
+        homepageOrder: Number(row.homepage_order) || 0,
         createdAt: row.created_at,
         url,
       };
     }));
+  }
+
+  const DEFAULT_SETTINGS = {
+    notificationEnabled: false,
+    notificationText: '',
+    notificationLinkText: '',
+    notificationLinkUrl: '',
+  };
+
+  async function readSiteSettings() {
+    const found = rows(await db.from('site_settings').select('setting_key,setting_value').limit(50));
+    const values = { ...DEFAULT_SETTINGS };
+    for (const row of found) {
+      if (row.setting_key === 'notificationEnabled') values.notificationEnabled = row.setting_value === 'true';
+      if (row.setting_key === 'notificationText') values.notificationText = row.setting_value || '';
+      if (row.setting_key === 'notificationLinkText') values.notificationLinkText = row.setting_value || '';
+      if (row.setting_key === 'notificationLinkUrl') values.notificationLinkUrl = row.setting_value || '';
+    }
+    return values;
+  }
+
+  async function signedHomepageImages() {
+    const found = rows(await db.from('gallery_images')
+      .select('id,caption,object_path,created_at,homepage_role,homepage_order,status')
+      .eq('status', 'ready').neq('homepage_role', 'gallery').order('homepage_order', { ascending: true }).limit(12));
+    const signed = await Promise.allSettled(found.map(async (row) => {
+      const result = await storage.createSignedUrl(row.object_path, 3600);
+      if (!result?.signedUrl) throw new Error('sign_failed');
+      return { id: row.id, caption: row.caption, role: row.homepage_role, url: result.signedUrl, createdAt: row.created_at };
+    }));
+    return signed.filter((entry) => entry.status === 'fulfilled').map((entry) => entry.value);
+  }
+
+  async function replaceHomepageHero(exceptId = null) {
+    let query = db.from('gallery_images').update({ homepage_role: 'gallery' }).eq('homepage_role', 'hero');
+    if (exceptId) query = query.neq('id', exceptId);
+    const result = await query;
+    if (result.error) fail('database_unavailable', 503);
   }
 
   // ---- routes ---------------------------------------------------------------
@@ -546,6 +586,16 @@ export function application({ db, storage, BackendError, env }) {
 
     if (path === '/api/gallery' && is('GET')) {
       return json({ ok: true, items: await viewableImages(60) });
+    }
+
+    if (path === '/api/homepage' && is('GET')) {
+      const items = await signedHomepageImages();
+      return json({
+        ok: true,
+        settings: await readSiteSettings(),
+        hero: items.find((item) => item.role === 'hero') ?? null,
+        news: items.filter((item) => item.role === 'news').slice(0, 8),
+      });
     }
 
     if (path === '/api/apply' && is('POST')) {
@@ -974,6 +1024,41 @@ export function application({ db, storage, BackendError, env }) {
       return json({ ok: true });
     }
 
+    if (path === '/api/admin/site-settings' && is('GET')) {
+      await requireAdmin(request);
+      return json({ ok: true, settings: await readSiteSettings() });
+    }
+
+    if (path === '/api/admin/site-settings' && is('PATCH')) {
+      await requireAdmin(request);
+      const body = await readJson(request, 4096);
+      const notificationEnabled = body.notificationEnabled === true;
+      const notificationText = clean(body.notificationText, 240);
+      const notificationLinkText = clean(body.notificationLinkText, 80);
+      const notificationLinkUrl = clean(body.notificationLinkUrl, 300);
+      if (notificationLinkUrl) {
+        try {
+          const url = new URL(notificationLinkUrl);
+          if (!['http:', 'https:'].includes(url.protocol)) fail('invalid_input', 400);
+        } catch { fail('invalid_input', 400); }
+      }
+      const values = {
+        notificationEnabled: String(notificationEnabled),
+        notificationText,
+        notificationLinkText,
+        notificationLinkUrl,
+      };
+      for (const [settingKey, settingValue] of Object.entries(values)) {
+        const existing = rows(await db.from('site_settings').select('setting_key').eq('setting_key', settingKey).limit(1));
+        const payload = { setting_value: settingValue, updated_at: new Date().toISOString() };
+        const result = existing.length
+          ? await db.from('site_settings').update(payload).eq('setting_key', settingKey).select('setting_key')
+          : await db.from('site_settings').insert({ setting_key: settingKey, ...payload }).select('setting_key');
+        if (result.error) fail('database_unavailable', 503);
+      }
+      return json({ ok: true, settings: await readSiteSettings() });
+    }
+
     if (path === '/api/admin/gallery' && is('GET')) {
       await requireAdmin(request);
       return json({ ok: true, items: await adminGallery() });
@@ -983,10 +1068,12 @@ export function application({ db, storage, BackendError, env }) {
       await requireAdmin(request);
       const body = await readJson(request, 4096);
       const caption = clean(body.caption, 120);
+      const homepageRole = ['gallery', 'news', 'hero'].includes(body.homepageRole) ? body.homepageRole : 'gallery';
       const contentType = typeof body.contentType === 'string' ? body.contentType.toLowerCase() : '';
       const sizeBytes = body.sizeBytes;
       if (!IMAGE_TYPES.includes(contentType)) fail('unsupported_media_type', 415);
       if (!Number.isSafeInteger(sizeBytes) || sizeBytes < 1 || sizeBytes > MAX_IMAGE_BYTES) fail('invalid_input', 400);
+      if (homepageRole === 'hero') await replaceHomepageHero();
 
       const inserted = await db.from('gallery_images').insert({
         caption,
@@ -994,6 +1081,8 @@ export function application({ db, storage, BackendError, env }) {
         content_type: contentType,
         size_bytes: sizeBytes,
         status: 'pending',
+        homepage_role: homepageRole,
+        homepage_order: Number.isSafeInteger(body.homepageOrder) ? Math.max(0, Math.min(99, body.homepageOrder)) : 0,
         created_at: new Date().toISOString(),
       }).select('id,object_path');
       if (inserted.error || !inserted.data?.length) fail('database_unavailable', 503);
@@ -1063,6 +1152,20 @@ export function application({ db, storage, BackendError, env }) {
     }
 
     const galleryMatch = path.match(/^\/api\/admin\/gallery\/([0-9a-f-]{36})$/);
+    if (galleryMatch && is('PATCH')) {
+      await requireAdmin(request);
+      const id = galleryMatch[1];
+      if (!UUID.test(id)) fail('not_found', 404);
+      const body = await readJson(request, 2048);
+      const homepageRole = ['gallery', 'news', 'hero'].includes(body.homepageRole) ? body.homepageRole : null;
+      if (!homepageRole) fail('invalid_input', 400);
+      const homepageOrder = body.homepageOrder === undefined ? 0 : Number(body.homepageOrder);
+      if (!Number.isInteger(homepageOrder) || homepageOrder < 0 || homepageOrder > 99) fail('invalid_input', 400);
+      if (homepageRole === 'hero') await replaceHomepageHero(id);
+      const updated = await db.from('gallery_images').update({ homepage_role: homepageRole, homepage_order: homepageOrder }).eq('id', id).select('id,homepage_role,homepage_order');
+      if (updated.error || !updated.data?.length) fail(updated.error ? 'database_unavailable' : 'not_found', updated.error ? 503 : 404);
+      return json({ ok: true });
+    }
     if (galleryMatch && is('DELETE')) {
       await requireAdmin(request);
       const id = galleryMatch[1];

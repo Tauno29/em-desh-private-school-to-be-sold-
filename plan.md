@@ -1,24 +1,25 @@
-# Bulk learner registration
+# Landing page content management
 
 ## Implementation
 
-Add a staff-only CSV import workflow to the existing learner dashboard without changing the production database schema or individual registration flow. The browser will download a CSV template, parse and validate one learner per row, preview valid and invalid rows, detect duplicates against the current learner list and within the file, then call the existing authenticated learner-registration endpoint sequentially for confirmed valid rows. Generated student IDs and one-time PINs will be collected in a printable results view. No import is sent until the admin confirms it.
+Extend the existing MySQL-backed gallery workflow with a small `site_settings` table and homepage placement metadata on `gallery_images`. Staff can edit a notification banner, upload a replacement hero image, and upload or assign recent-event photos to homepage news slots. The public landing page loads this content through a public API endpoint, removes the welcome video, renders a safe local hero fallback until a staff image is selected, and rotates recent-event images with accessible previous/next controls. Existing gallery uploads and learner/admin workflows remain intact.
 
 ## Design
 
-- **Design movement:** Quiet school-office utility: calm, structured, and practical.
-- **Core principles:** clear next action, visible validation, reversible review before write, and credentials treated as one-time information.
-- **Color philosophy:** reuse the existing deep green, warm paper, and amber status colors so the workflow feels native to the dashboard.
-- **Layout paradigm:** a focused wide sheet that moves from instructions to preview to results.
-- **Signature elements:** compact step labels, validation summary chips, and a print-ready credential list.
-- **Interaction philosophy:** never write rows during file selection; make the import action explicit and disable it while rows are being created.
-- **Typography system:** preserve the existing Fraunces headings and Inter interface text.
-- **Brand essence:** a trustworthy school office tool for registering a whole class accurately; calm, careful, useful.
-- **Brand voice:** “Review every row before saving.” and “Keep this credential sheet safe.”
+- **Design movement:** Editorial school bulletin: a calm green-and-paper landing page with a clear notice strip and rotating event cards.
+- **Core principles:** visible school updates, simple staff editing, safe empty states, and accessible controls.
+- **Color philosophy:** use the existing forest green, cream, and light border palette so notices feel native rather than promotional.
+- **Layout paradigm:** a compact notice above the hero, an image-led hero, and a focused recent-events rail before the school facts.
+- **Signature elements:** amber notice accent, framed hero image, and numbered event carousel controls.
+- **Interaction philosophy:** public content never blocks the page if unavailable; carousel controls are keyboard-friendly and pause between changes.
+- **Typography system:** preserve Fraunces for school/editorial headings and Inter for controls and metadata.
+- **Brand essence:** a living school noticeboard for families in Okahao; warm, current, trustworthy.
+- **Brand voice:** “School updates, shared from the office.” and “See what has been happening at Em-Desh.”
 
 ## Project structure
 
-- `admin.html`: bulk-import and credentials dialog markup.
-- `admin.js`: CSV parsing, validation, preview, import, and print interactions.
-- `styles.css`: responsive dialog, preview table, validation states, and printable credential styles.
-- Existing `functions/routes.mjs`: unchanged; imports reuse the authenticated `POST /api/admin/learners` route.
+- `index.html`, `app.js`, `styles.css`: landing notification, fallback hero, and recent-event carousel.
+- `admin.html`, `admin.js`: staff content editor and gallery placement controls.
+- `functions/routes.mjs`: public homepage-content endpoint and protected settings/placement routes.
+- `server.mjs`: MySQL settings table and backward-compatible gallery metadata migration.
+- `dev/test.mjs`: regression coverage for homepage content, settings, and placement controls.
