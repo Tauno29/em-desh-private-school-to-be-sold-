@@ -1,10 +1,10 @@
 import { application } from '../../functions/routes.mjs';
 import {
-  BackendError, MysqlStorage, createDatabaseClient, initSchema,
-} from '../../functions/mysql-runtime.mjs';
+  BackendError, PostgresStorage, createDatabaseClient, verifySchema,
+} from '../../functions/postgres-runtime.mjs';
 
 const db = createDatabaseClient();
-const storage = new MysqlStorage();
+const storage = new PostgresStorage();
 const handle = application({
   db,
   storage,
@@ -14,7 +14,7 @@ const handle = application({
 
 let schemaReady;
 function ensureSchema() {
-  schemaReady ??= initSchema().catch((error) => {
+  schemaReady ??= verifySchema().catch((error) => {
     schemaReady = undefined;
     throw error;
   });

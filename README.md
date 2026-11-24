@@ -1,6 +1,6 @@
 # Em-Desh English Medium Private School
 
-The site is a static frontend backed by a Node/MySQL API. It can now run on Netlify using the serverless function in `netlify/functions/app.mjs`.
+The site is a static frontend backed by a Netlify serverless API using Supabase PostgreSQL. The serverless function is in `netlify/functions/app.mjs`.
 
 ## Netlify setup
 
@@ -8,17 +8,17 @@ Create a Netlify site from this repository and use the committed `netlify.toml`.
 
 Configure these Netlify environment variables for the production deploy:
 
-- `DATABASE_URL`: the existing MySQL connection URL. Keep the current MySQL database; no migration is performed.
+- `DATABASE_URL`: the Supabase PostgreSQL connection string. The existing MySQL source was copied non-destructively and remains available until the Supabase deployment is fully validated.
 - `ADMIN_CODE`: the existing six-digit staff authentication code.
 - `PUBLIC_SITE_ORIGIN`: the exact HTTPS Netlify site URL, for example `https://your-site.netlify.app`.
 - `SITE_HOST_SUFFIX`: optional owner/domain suffix for an approved site-origin pattern. It is not needed when `PUBLIC_SITE_ORIGIN` is set.
 - `DB_CONNECTION_LIMIT`: optional MySQL pool limit; the default is `2`, which is appropriate for serverless cold-start concurrency.
 
-The database user must be allowed to connect from Netlify and must have permission to create or alter the application tables on first invocation. If the existing database is already initialized, the function only verifies the schema.
+The database user must be allowed to connect from Netlify. The Supabase schema is defined in `supabase/schema.sql`; the Netlify function verifies connectivity at startup and does not run destructive schema changes.
 
 ## Preserved workflows
 
-The serverless function keeps the existing API routes and MySQL-backed workflows: staff authentication and throttling, learner registration and portal access, CSV-compatible learner operations, applications, gallery management, homepage content, welcome-video replacement, learner records, report cards, and deletion workflows.
+The serverless function keeps the existing API routes and workflows on Supabase: staff authentication and throttling, learner registration and portal access, CSV-compatible learner operations, applications, gallery management, homepage content, welcome-video replacement, learner records, report cards, and deletion workflows.
 
 ## Media upload limitation
 
@@ -32,4 +32,4 @@ npm test
 npm run build
 ```
 
-The local development server remains available with `npm start` when `DATABASE_URL` is configured.
+The legacy Node container remains available with `npm start` for the former MySQL runtime. Netlify production uses the PostgreSQL runtime and the Supabase `DATABASE_URL`.
