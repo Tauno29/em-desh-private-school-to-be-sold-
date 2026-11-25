@@ -1,0 +1,22 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+  functions = "netlify/functions"
+
+[functions]
+  node_bundler = "esbuild"
+
+[[redirects]]
+  from = "/functions/v1/app/*"
+  to = "/.netlify/functions/app/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/storage/upload/*"
+  to = "/.netlify/functions/app/storage/upload/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/storage/view/*"
+  to = "/.netlify/functions/app/storage/view/:splat"
+  status = 200
