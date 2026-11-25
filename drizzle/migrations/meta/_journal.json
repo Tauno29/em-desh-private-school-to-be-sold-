@@ -1,0 +1,27 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1795625960995,
+      "tag": "0000_school_schema",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1795626841872,
+      "tag": "0001_add_correct_school_schema",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1795627655643,
+      "tag": "0002_school_application_forms",
+      "breakpoints": true
+    }
+  ]
+}
