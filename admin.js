@@ -1,7 +1,7 @@
 import {
   ApiError, api, clearAuthToken, DOCUMENT_TYPES, errorMessage, formatDate, gradeLabel,
   IMAGE_TYPES, MAX_DOCUMENT_BYTES, MAX_IMAGE_BYTES, MAX_VIDEO_BYTES, VIDEO_TYPES, setAuthToken,
-} from './api.js?v=20261125a';
+} from './api.js?v=20261125p';
 
 const TOKEN_KEY = 'omps_admin_token';
 
@@ -1817,14 +1817,6 @@ photoForm.addEventListener('submit', async (event) => {
 // ---- tabs ------------------------------------------------------------------
 
 const tabs = [
-  {
-    button: document.getElementById('tab-btn-learners'),
-    panel: document.getElementById('tab-learners'),
-  },
-  {
-    button: document.getElementById('tab-btn-applications'),
-    panel: document.getElementById('tab-applications'),
-  },
   {
     button: document.getElementById('tab-btn-homepage'),
     panel: document.getElementById('tab-homepage'),

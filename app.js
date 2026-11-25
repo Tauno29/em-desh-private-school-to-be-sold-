@@ -22,6 +22,45 @@
   const homepageNewsPrev = document.getElementById('homepage-news-prev');
   const homepageNewsNext = document.getElementById('homepage-news-next');
 
+  let welcomeStarted = false;
+  function startWelcomeVideo(url) {
+    const v = homepageWelcomeVideo;
+    if (!v || welcomeStarted) return;
+    welcomeStarted = true;
+    const btn = document.getElementById('hero-sound-btn');
+    const showIcon = () => {
+      if (!btn) return;
+      btn.textContent = v.muted ? '🔇' : '🔊';
+      btn.classList.add('show');
+      clearTimeout(btn._t);
+      btn._t = setTimeout(() => btn.classList.remove('show'), 900);
+    };
+    v.src = url;
+    v.muted = false;
+    v.play().catch(() => {
+      // Browser blocked sound before any interaction: play muted, unmute on first interaction.
+      v.muted = true;
+      v.play().catch(() => {});
+      const unlock = (e) => {
+        if (e.target && e.target.closest && e.target.closest('.hero-video-wrap')) return;
+        v.muted = false; v.play().catch(() => {});
+        ['pointerdown','keydown','touchstart','scroll'].forEach((t) => window.removeEventListener(t, unlock, true));
+      };
+      ['pointerdown','keydown','touchstart','scroll'].forEach((t) => window.addEventListener(t, unlock, true));
+    });
+    const muteBtn = document.getElementById('hero-mute-btn');
+    const syncMute = () => { if (muteBtn) { muteBtn.textContent = v.muted ? '🔇' : '🔊'; muteBtn.setAttribute('aria-label', v.muted ? 'Unmute video' : 'Mute video'); } };
+    v.addEventListener('volumechange', syncMute); syncMute();
+    if (muteBtn) muteBtn.addEventListener('click', (e) => { e.stopPropagation(); v.muted = !v.muted; syncMute(); });
+    const togglePlay = () => {
+      if (v.paused) { v.play().catch(() => {}); if (btn) btn.textContent = '▶'; }
+      else { v.pause(); if (btn) btn.textContent = '❚❚'; }
+      if (btn) { btn.classList.add('show'); clearTimeout(btn._t); btn._t = setTimeout(() => btn.classList.remove('show'), 900); }
+    };
+    v.addEventListener('click', togglePlay);
+  }
+  if (homepageWelcomeVideo) setTimeout(() => { if (!welcomeStarted) startWelcomeVideo('assets/hero-video.mp4'); }, 2500);
+
   let newsItems = [];
   let newsIndex = 0;
 
@@ -51,7 +90,7 @@
 
   async function loadHomepage() {
     try {
-      const response = await fetch('/.netlify/functions/app/api/homepage', { headers: { accept: 'application/json' } });
+      const response = await fetch((/lovable\.app$|localhost/.test(location.hostname) ? '/school-api' : 'https://project--cf4a80e7-8301-450b-b19f-d5fb82508f21.lovable.app/api/public/school') + '/homepage', { headers: { accept: 'application/json' } });
       if (!response.ok) return;
       const data = await response.json();
       const settings = data.settings ?? {};
@@ -64,11 +103,15 @@
         }
         homepageNotice.hidden = false;
       }
-      if (data.welcomeVideo?.url) {
-        homepageWelcomeVideo.src = data.welcomeVideo.url;
-        homepageWelcomeVideo.load();
+      startWelcomeVideo(data.welcomeVideo?.url || 'assets/hero-video.mp4');
+      const allImages = Array.isArray(data.news) ? data.news : [];
+      const heroImage = data.hero ?? allImages.find((item) => item.role === 'hero');
+      const heroSection = document.querySelector('.hero');
+      if (heroImage?.url && heroSection) {
+        heroSection.style.setProperty('--hero-bg-image', `url("${heroImage.url.replace(/"/g, '%22')}")`);
+        heroSection.classList.add('has-bg');
       }
-      newsItems = Array.isArray(data.news) ? data.news : [];
+      newsItems = allImages.filter((item) => item.role !== 'hero');
       if (newsItems.length) {
         homepageNews.hidden = false;
         homepageNewsControls.hidden = false;
