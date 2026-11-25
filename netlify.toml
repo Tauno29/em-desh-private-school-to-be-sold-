@@ -1,0 +1,3 @@
+[build]
+  command = "test -s public/index.html"
+  publish = "public"

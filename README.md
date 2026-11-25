@@ -21,6 +21,14 @@ npm i
 npm run dev
 ```
 
+## Netlify deployment
+
+Netlify publishes the static school site directly from `public/`, including its
+redirects and headers. The Netlify build command only checks that the homepage
+exists; it does not run the TanStack Start build. The public site continues to
+use the Lovable-hosted school services, and `bun run build` remains available
+for the Lovable deployment.
+
 ## Built with
 
 - TanStack Start
